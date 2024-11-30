@@ -26,8 +26,8 @@ include $(DEVKITPRO)/libnx/switch_rules
 # ICON is the filename of the icon (.jpg), relative to the project folder.
 #   If not set, it attempts to use one of the following (in this order):
 #     - <Project name>.jpg
-#     - icon.png
-#     - <libnx folder>/default_icon.png
+#     - icon.jpg
+#     - <libnx folder>/default_icon.jpg
 #
 # CONFIG_JSON is the filename of the NPDM config file (.json), relative to the project folder.
 #   If not set, it attempts to use one of the following (in this order):
@@ -131,8 +131,8 @@ ifeq ($(strip $(ICON)),)
 	ifneq (,$(findstring $(TARGET).jpg,$(icons)))
 		export APP_ICON := $(TOPDIR)/$(TARGET).jpg
 	else
-		ifneq (,$(findstring icon.png,$(icons)))
-			export APP_ICON := $(TOPDIR)/icon.png
+		ifneq (,$(findstring icon.jpg,$(icons)))
+			export APP_ICON := $(TOPDIR)/icon.jpg
 		endif
 	endif
 else
