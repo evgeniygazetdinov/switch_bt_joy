@@ -1,63 +1,62 @@
 #include "bluetooth_handler.h"
-#include <string.h>
-#include <stdio.h>
+#include "bluetooth/bluetooth_core.hpp"
+#include <cstring>
+#include <cstdio>
 
-BluetoothHandler::BluetoothHandler() : 
-    m_initialized(false), 
-    m_connected(false),
-    m_advertising(false) {
-    memset(&m_deviceAddress, 0, sizeof(BtdrvAddress));
-    memset(&m_connectedDevice, 0, sizeof(BluetoothDeviceInfo));
-    memset(m_lastError, 0, sizeof(m_lastError));
+BluetoothHandler::BluetoothHandler() 
+    : m_initialized(false)
+    , m_connected(false)
+    , m_advertising(false) {
     eventCreate(&m_connectionEvent, false);
 }
 
 BluetoothHandler::~BluetoothHandler() {
-    if (m_connected) {
-        disconnect();
-    }
-    if (m_advertising) {
-        stopAdvertising();
-    }
     if (m_initialized) {
-        btdrvExit();
+        disconnect();
+        bluetooth::core::Finalize();
     }
     eventClose(&m_connectionEvent);
 }
 
 bool BluetoothHandler::initialize() {
-    Result rc = btdrvInitialize();
-    if (R_FAILED(rc)) {
-        return false;
+    if (m_initialized) {
+        return true;
     }
+
+    Result rc;
     
-    rc = btdrvEnableBluetooth();
+    // Инициализируем Bluetooth core
+    rc = bluetooth::core::Initialize();
     if (R_FAILED(rc)) {
-        btdrvExit();
+        snprintf(m_lastError, sizeof(m_lastError), "Failed to initialize Bluetooth core: 0x%x", rc);
         return false;
     }
 
-    // Установка режима Bluetooth
-    rc = btmSetBluetoothMode(BtmBluetoothMode_StaticJoy);
+    // Регистрируем callback для событий подключения
+    rc = bluetooth::core::RegisterEventCallback(bluetooth::EventType_Connection, &m_connectionEvent);
     if (R_FAILED(rc)) {
-        btdrvExit();
+        snprintf(m_lastError, sizeof(m_lastError), "Failed to register connection callback: 0x%x", rc);
+        bluetooth::core::Finalize();
         return false;
     }
-    
+
     m_initialized = true;
     return true;
 }
 
 bool BluetoothHandler::startAdvertising() {
-    if (!m_initialized || m_advertising) {
+    if (!m_initialized) {
+        snprintf(m_lastError, sizeof(m_lastError), "Bluetooth not initialized");
         return false;
     }
 
-    // Начинаем поиск устройств
-    // timeout_ms = 10000 (10 секунд)
-    // max_devices = 8
-    Result rc = btdrvStartInquiry(8, 10000000000LL);
+    if (m_advertising) {
+        return true;
+    }
+
+    Result rc = bluetooth::core::StartDiscovery();
     if (R_FAILED(rc)) {
+        snprintf(m_lastError, sizeof(m_lastError), "Failed to start advertising: 0x%x", rc);
         return false;
     }
 
@@ -67,11 +66,12 @@ bool BluetoothHandler::startAdvertising() {
 
 bool BluetoothHandler::stopAdvertising() {
     if (!m_initialized || !m_advertising) {
-        return false;
+        return true;
     }
 
-    Result rc = btdrvStopInquiry();
+    Result rc = bluetooth::core::CancelDiscovery();
     if (R_FAILED(rc)) {
+        snprintf(m_lastError, sizeof(m_lastError), "Failed to stop advertising: 0x%x", rc);
         return false;
     }
 
@@ -80,78 +80,67 @@ bool BluetoothHandler::stopAdvertising() {
 }
 
 bool BluetoothHandler::waitForConnection(u32 timeout_ms) {
-    if (!m_advertising || m_connected) {
-        snprintf(m_lastError, sizeof(m_lastError), "Invalid state for connection");
+    if (!m_initialized || m_connected) {
         return false;
     }
 
-    // Ожидаем события подключения
-    Result rc = eventWait(&m_connectionEvent, timeout_ms * 1000000ULL);
-    if (R_FAILED(rc)) {
-        snprintf(m_lastError, sizeof(m_lastError), "Connection timeout");
+    // Ждем события подключения
+    if (!eventWait(&m_connectionEvent, timeout_ms * 1000000ULL)) {
         return false;
     }
 
-    // Временная переменная для адреса и настроек устройства
-    
-    BtmDeviceInfoV13 deviceInfo = {0};
-    s32 device_count = 0;
-    
-    // Получаем информацию о подключенном устройстве
-    rc = btmGetDeviceInfo(BtmProfile_Hid, &deviceInfo, sizeof(deviceInfo), &device_count);
-    
+    // Получаем информацию о событии
+    bluetooth::EventType type;
+    bluetooth::EventInfo info;
+    Result rc = bluetooth::core::GetEventInfo(&type, &info, sizeof(info));
     if (R_FAILED(rc)) {
-        snprintf(m_lastError, sizeof(m_lastError), "Failed to get device info");
         return false;
     }
-    BtdrvAddress tempAddress;
-    m_connected = true;
-    m_deviceAddress = tempAddress;
-    m_connectedDevice.address = tempAddress;
-    
-    // Тип и RSSI пока установим по умолчанию, так как их нет в структуре
-    m_connectedDevice.type = 0;  // HID device type
-    m_connectedDevice.rssi = 0;  // Unknown signal strength
-    
-    // Копируем имя устройства
-    strncpy(m_connectedDevice.name, (const char*)deviceInfo.name, sizeof(m_connectedDevice.name) - 1);
-    m_connectedDevice.name[sizeof(m_connectedDevice.name) - 1] = '\0';
-    
-    stopAdvertising();
-    return true;
+
+    if (type == bluetooth::EventType_Connection) {
+        // Получаем адрес подключенного устройства из структуры события
+        BtdrvEventInfo* btdrv_info = reinterpret_cast<BtdrvEventInfo*>(&info);
+        m_deviceAddress = btdrv_info->connection.addr;
+        m_connected = true;
+        return true;
+    }
+
+    return false;
 }
 
 bool BluetoothHandler::disconnect() {
-    if (!m_connected) {
-        return false;
+    if (!m_initialized || !m_connected) {
+        return true;
     }
-    
-    Result rc = btdrvCloseHidConnection(m_deviceAddress);
+
+    Result rc = bluetooth::core::Disconnect(&m_deviceAddress);
     if (R_FAILED(rc)) {
+        snprintf(m_lastError, sizeof(m_lastError), "Failed to disconnect: 0x%x", rc);
         return false;
     }
-    
+
     m_connected = false;
     return true;
 }
 
 bool BluetoothHandler::sendKeyPress(u32 keyCode) {
-    if (!m_connected) {
+    if (!m_initialized || !m_connected) {
         return false;
     }
-    
-    // Создаем пакет с данными нажатия клавиши
-    BtdrvHidReport report;
-    report.data[0] = keyCode;
-    report.size = 8; // Стандартный размер HID отчета клавиатуры
-    
-    Result rc = btdrvSetHidReport(m_deviceAddress, 
-                                 BtdrvBluetoothHhReportType_Input,
-                                 &report);
+
+    // Формируем HID отчет
+    bluetooth::HidReport report = {};
+    report.data[0] = keyCode & 0xFF;
+    report.size = 1;
+
+    Result rc = btdrvSetHidReport(m_deviceAddress,
+                                  bluetooth::HhReportType_Input,
+                                  &report);
     if (R_FAILED(rc)) {
+        snprintf(m_lastError, sizeof(m_lastError), "Failed to send HID report: 0x%x", rc);
         return false;
     }
-    
+
     return true;
 }
 
@@ -163,12 +152,16 @@ bool BluetoothHandler::isAdvertising() {
     return m_advertising;
 }
 
-bool BluetoothHandler::getConnectedDeviceInfo(BluetoothDeviceInfo* deviceInfo) {
-    if (!m_connected || !deviceInfo) {
-        snprintf(m_lastError, sizeof(m_lastError), "Not connected or invalid pointer");
+bool BluetoothHandler::getConnectedDeviceInfo(bluetooth::DeviceInfo* deviceInfo) {
+    if (!m_initialized || !m_connected || !deviceInfo) {
         return false;
     }
-    
-    *deviceInfo = m_connectedDevice;
+
+    Result rc = bluetooth::core::GetDeviceInfo(&m_deviceAddress, deviceInfo);
+    if (R_FAILED(rc)) {
+        snprintf(m_lastError, sizeof(m_lastError), "Failed to get device info: 0x%x", rc);
+        return false;
+    }
+
     return true;
 }

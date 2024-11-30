@@ -1,194 +1,118 @@
 // Include the most common headers from the C standard library
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <string>
 #include <switch.h>
+// #include <string.h>
 #include "bluetooth_handler.h"
 
 // See also libnx pad.h / hid.h.
 
 // Main program entrypoint
-int main(int argc, char* argv[])
+
+std::string random_string(){
+
+			int randomNum = rand() % 101;
+
+				std::string str = std::to_string(randomNum);   
+				return str;
+		}
+const int KEY_X = 4;
+const int KEY_Y = 28;
+const int KEY_A = 5;
+const int KEY_B = 27;
+const int KEY_PLUS = 1024;
+const int KEY_MINUS = 2048;
+
+bool mainMenu()
 {
-    consoleInit(NULL);
-    
-    // // Инициализация логгера
-    // if (!ConnectionLogger::initialize("sdmc:/switch/bluetooth_connections.log")) {
-    //     printf("Warning: Failed to initialize logger: %s\n", ConnectionLogger::getLastError());
-    // }
-    
-    // Инициализация Bluetooth
-    BluetoothHandler btHandler;
-    if (!btHandler.initialize()) {
-        printf("Failed to initialize Bluetooth\n");
-        consoleExit(NULL);
-        return 1;
-    }
-    
-    // Начинаем поиск устройств
-    printf("\x1b[1;1HStarting Bluetooth advertising...");
-    if (!btHandler.startAdvertising()) {
-        printf("\x1b[2;1HFailed to start advertising\n");
-        consoleExit(NULL);
-        return 1;
-    }
-    
-    printf("\x1b[2;1HWaiting for Bluetooth connection...");
-    printf("\x1b[3;1HPress B to cancel");
-    
-    // Конфигурация контроллера
+	printf("\n\n-------- Main Menu --------\n");
+	printf("Press B to run bluetooth init\n");
+
+
+    // Configure our supported input layout: a single player with standard controller styles
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+
+    // Initialize the default gamepad (which reads handheld mode inputs as well as the first connected controller)
     PadState pad;
     padInitializeDefault(&pad);
-    
-    // Ожидаем подключения или нажатия кнопки B для отмены
-    while (!btHandler.isConnected() && appletMainLoop())
-    {
-        padUpdate(&pad);
-        u64 kDown = padGetButtonsDown(&pad);
-        
-        if (kDown & HidNpadButton_B) {
-            printf("\x1b[4;1HCancelled by user\n");
-            btHandler.stopAdvertising();
-            consoleExit(NULL);
-            return 0;
-        }
-        
-        // Проверяем подключение каждые 100мс
-        if (btHandler.waitForConnection(100)) {
-            BluetoothDeviceInfo deviceInfo;
-            if (btHandler.getConnectedDeviceInfo(&deviceInfo)) {
-                // Выводим информацию на экран
-                printf("\x1b[4;1HDevice connected!\n");
-                printf("\x1b[5;1HName: %s\n", deviceInfo.name);
-                printf("\x1b[6;1HAddress: %02X:%02X:%02X:%02X:%02X:%02X\n",
-                       deviceInfo.address.address[0], deviceInfo.address.address[1],
-                       deviceInfo.address.address[2], deviceInfo.address.address[3],
-                       deviceInfo.address.address[4], deviceInfo.address.address[5]);
-                printf("\x1b[7;1HRSSI: %d dBm\n", deviceInfo.rssi);
-                
-                // Логируем подключение
-                // if (!ConnectionLogger::logConnection(deviceInfo)) {
-                //     printf("\x1b[8;1HWarning: Failed to log connection: %s\n", 
-                //            ConnectionLogger::getLastError());
-                // }
-            } else {
-                printf("\x1b[4;1HDevice connected, but failed to get info: %s\n", 
-                       btHandler.getLastErrorMessage());
-            }
-            break;
-        }
-        
-        consoleUpdate(NULL);
-    }
-    
-    if (!btHandler.isConnected()) {
-        printf("\x1b[4;1HFailed to establish connection: %s\n", 
-               btHandler.getLastErrorMessage());
-        consoleExit(NULL);
-        return 1;
-    }
-    
-    // Ждем 3 секунды, чтобы пользователь мог прочитать информацию
-    svcSleepThread(3000000000ULL);
-    
-    // Очищаем консоль и показываем основной интерфейс
-    consoleClear();
-    printf("\x1b[1;1HPress PLUS to exit.");
-    printf("\x1b[2;1HBluetooth connected and ready!");
-    printf("\x1b[3;1HPress buttons to send via Bluetooth");
-    
-    //Matrix containing the name of each key. Useful for printing when a key is pressed
-    char keysNames[28][32] = {
-        "A", "B", "X", "Y",
-        "StickL", "StickR", "L", "R",
-        "ZL", "ZR", "Plus", "Minus",
-        "Left", "Up", "Right", "Down",
-        "StickLLeft", "StickLUp", "StickLRight", "StickLDown",
-        "StickRLeft", "StickRUp", "StickRRight", "StickRDown",
-        "LeftSL", "LeftSR", "RightSL", "RightSR",
-    };
 
-    u32 kDownOld = 0, kHeldOld = 0, kUpOld = 0; //In these variables there will be information about keys detected in the previous frame
 
-    printf("\x1b[4;1HLeft joystick position:");
-    printf("\x1b[6;1HRight joystick position:");
 
-    // Main loop
-    while(appletMainLoop())
-    {
-        // Scan the gamepad. This should be done once for each frame
-        padUpdate(&pad);
+
+	while (appletMainLoop())
+	{
+			
+		padUpdate(&pad);
 
         // padGetButtonsDown returns the set of buttons that have been
         // newly pressed in this frame compared to the previous one
         u64 kDown = padGetButtonsDown(&pad);
+   
+		if (kDown & KEY_X)
+		{
+			// return install();
+            printf("X");
+		}
+		else if (kDown & KEY_Y)
+		{
+			// return install();
+            printf("Y");
+		}
+		else if (kDown & KEY_A) // A
+		{
+			// return install();
+            printf("A");
+		}
+		else if (kDown & KEY_B) // A
+		{
+			// return install();
+            printf("B");
+			BluetoothHandler btHandler;
+			bool is_running = btHandler.initialize();
+			if(!is_running){
+				printf("is not running");
 
-        // padGetButtons returns the set of buttons that are currently pressed
-        u64 kHeld = padGetButtons(&pad);
+			}else{
+				printf("is running");
+			}
+		
+			
+			// // Начинаем поиск устройств
+			// printf("\x1b[1;1HStarting Bluetooth advertising...");
+			// if (!btHandler.startAdvertising()) {
+			// 	printf("\x1b[2;1HFailed to start advertising\n");
+			// 	// consoleExit(NULL);
+			// 	// return 1;
+			// }
+			
+			// printf("\x1b[2;1HWaiting for Bluetooth connection...");
+			// printf("\x1b[3;1HPress B to cancel");
+		}
+		else if(kDown & KEY_MINUS){
+			break;
+		}
+		// elif
+		// std::string stri;
+		// std::string str = std::to_string(kDown);
+		// printf(str.c_str()); 
+		consoleUpdate(NULL);
+	}
+	return true;
+}
 
-        // padGetButtonsUp returns the set of buttons that have been
-        // newly released in this frame compared to the previous one
-        u64 kUp = padGetButtonsUp(&pad);
 
-        if (kDown & HidNpadButton_Plus)
-            break; // break in order to return to hbmenu
 
-        // if (!btHandler.isConnected()) {
-        //     BluetoothDeviceInfo deviceInfo;
-        //     if (btHandler.getConnectedDeviceInfo(&deviceInfo)) {
-        //         ConnectionLogger::logDisconnection(deviceInfo);
-        //     }
-        //     printf("\x1b[4;1HBluetooth connection lost!\n");
-        //     break;
-        // }
+int main(int argc, char* argv[])
+{
+    
 
-        // Do the keys printing only if keys have changed
-        if (kDown != kDownOld || kHeld != kHeldOld || kUp != kUpOld)
-        {
-            // Clear console
-            consoleClear();
 
-            // These two lines must be rewritten because we cleared the whole console
-            printf("\x1b[1;1HPress PLUS to exit.");
-            printf("\x1b[2;1HBluetooth connected and ready!");
-            printf("\x1b[3;1HPress buttons to send via Bluetooth");
-            printf("\x1b[4;1HLeft joystick position:");
-            printf("\x1b[6;1HRight joystick position:");
-            printf("\x1b[7;1H"); //Move the cursor to the seventh row because on the previous ones we'll write the joysticks' position
 
-            // Check if some of the keys are down, held or up
-            int i;
-            for (i = 0; i < 28; i++)
-            {
-                if (kDown & BIT(i)) {
-                    btHandler.sendKeyPress(i);
-                    printf("\x1b[%d;1H%s sent via BT\n", 8 + i, keysNames[i]);
-                }
-                if (kHeld & BIT(i)) printf("\x1b[%d;1H%s held\n", 8 + i, keysNames[i]);
-                if (kUp & BIT(i)) printf("\x1b[%d;1H%s up\n", 8 + i, keysNames[i]);
-            }
-        }
+    fsInitialize();
 
-        // Set keys old values for the next frame
-        kDownOld = kDown;
-        kHeldOld = kHeld;
-        kUpOld = kUp;
-
-        // Read the sticks' position
-        HidAnalogStickState analog_stick_l = padGetStickPos(&pad, 0);
-        HidAnalogStickState analog_stick_r = padGetStickPos(&pad, 1);
-
-        // Print the sticks' position
-        printf("\x1b[5;1H%04d; %04d", analog_stick_l.x, analog_stick_l.y);
-        printf("\x1b[7;1H%04d; %04d", analog_stick_r.x, analog_stick_r.y);
-
-        // Update the console, sending a new frame to the display
-        consoleUpdate(NULL);
-    }
-
-    btHandler.disconnect();
-    // Deinitialize and clean up resources used by the console (important!)
+    consoleInit(NULL);
+    mainMenu();
     consoleExit(NULL);
     return 0;
 }
