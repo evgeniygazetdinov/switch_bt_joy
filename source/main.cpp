@@ -3,11 +3,11 @@
 #include "bluetooth/bluetooth_device.hpp"
 
 // Структура для хранения состояния кнопок
-// struct ButtonState {
-//     uint8_t buttons;  // Один байт для всех кнопок, каждый бит = одна кнопка
-//     int8_t stick_x;   // Положение стика по X (-127 до 127)
-//     int8_t stick_y;   // Положение стика по Y (-127 до 127)
-// };
+struct ButtonState {
+    uint8_t buttons;  // Один байт для всех кнопок, каждый бит = одна кнопка
+    int8_t stick_x;   // Положение стика по X (-127 до 127)
+    int8_t stick_y;   // Положение стика по Y (-127 до 127)
+};
 
 // namespace {
 //     // Размер HID репорта: 1 байт кнопки + 2 байта стик
@@ -44,8 +44,8 @@ bool mainLoop() {
     printf("Press - to exit\n");
 
     // Создаем Bluetooth устройство
-    // BluetoothDevice device;
-    // ButtonState button_state = {};
+    BluetoothDevice device;
+    ButtonState button_state = {};
     //uint8_t hid_report[HID_REPORT_SIZE] = {};
 
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
@@ -64,11 +64,12 @@ bool mainLoop() {
 
         if (kDown & HidNpadButton_B) {
             printf("Initializing Bluetooth...\n");
-            // Result rc = device.Initialize();
-            // if (R_FAILED(rc)) {
-            //     printf("Failed to initialize Bluetooth: %x\n", rc);
-            //     continue;
+            Result rc = device.Initialize();
+            if (R_FAILED(rc)) {
+                printf("Failed to initialize Bluetooth: %x\n", rc);
+                continue;
             }
+
         }
 
     //         printf("Starting advertising...\n");
@@ -138,7 +139,9 @@ bool mainLoop() {
     //     }
 
     //     svcSleepThread(16666667ULL);  // ~60Hz
-    // }
+
+                    consoleUpdate(NULL);
+    }
 
     return true;
 }

@@ -1,6 +1,7 @@
 #include "bluetooth_device.hpp"
 #include <switch.h>
-#include <cstring>  // для memcpy
+#include <cstring>// для memcpy
+#include <stdio.h>  
 
 namespace {
     // HID дескриптор для геймпада
@@ -48,33 +49,37 @@ Result BluetoothDevice::Initialize() {
         return 0;
     }
 
-    Result rc;
-
     // Инициализируем Bluetooth стек
-    rc = InitializeBluetooth();
+    Result rc = InitializeBluetooth();
     if (R_FAILED(rc)) {
+        printf("Failed to initialize Bluetooth: %x\n", rc);
         return rc;
     }
 
     // Включаем Bluetooth
     rc = EnableBluetooth();
     if (R_FAILED(rc)) {
+        printf("Failed to enable Bluetooth: %x\n", rc);
+
         return rc;
     }
 
     // Настраиваем режим устройства
     rc = SetupDeviceMode();
     if (R_FAILED(rc)) {
+        printf("Failed to setup Bluetooth: %x\n", rc);
         return rc;
     }
 
     // Настраиваем HID профиль
     rc = SetupHidProfile();
     if (R_FAILED(rc)) {
+        printf("Failed to setup Bluetooth: %x\n", rc);
         return rc;
     }
 
     m_initialized = true;
+    printf("SUCCESS: %x\n", rc);
     return 0;
 }
 
@@ -99,6 +104,7 @@ Result BluetoothDevice::InitializeBluetooth() {
     // Инициализируем HID стек с буфером для событий
     Result rc = btdrvInitializeHid(&m_event_buffer[0]);
     if (R_FAILED(rc)) {
+        printf("Failed to initialize HID: %x\n", rc);
         return rc;
     }
 
@@ -106,6 +112,7 @@ Result BluetoothDevice::InitializeBluetooth() {
     while (true) {
         rc = eventWait(&m_event_buffer[0], UINT64_MAX);
         if (R_FAILED(rc)) {
+            printf("Failed to wait for event: %x\n", rc);
             return rc;
         }
 
