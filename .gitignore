@@ -1,6 +1,8 @@
 *.elf
 *.nacp
 *.nro
-/build
-/MissionControl
+*.o
+build/
+MissionControl/
 .vscode/
+.map

@@ -187,9 +187,9 @@ Result BluetoothDevice::WaitForConnection() {
         }
 
         // Проверяем тип события
-        BtdrvEventInfo event_info;
+        BtdrvEventInfo event_info = {};
         BtdrvEventType event_type;
-        rc = btdrvGetEventInfo(nullptr, &event_info, &event_type);
+        rc = btdrvGetEventInfo(&event_info, sizeof(event_info), &event_type);
         if (R_FAILED(rc)) {
             return rc;
         }
@@ -215,19 +215,31 @@ Result BluetoothDevice::Disconnect() {
 }
 
 Result BluetoothDevice::SendReport(const uint8_t* report, size_t size) {
-    if (!m_initialized || !m_connected) {
+    if (!m_connected) {
         return -1;
     }
 
+    // Создаем HID репорт
+    BtdrvHidReport hid_report = {};
+    hid_report.size = size;
+    if (size > sizeof(hid_report.data)) {
+        return -1;
+    }
+    memcpy(hid_report.data, report, size);
+
     return btdrvSetHidReport(m_connected_address, 
                             BtdrvBluetoothHhReportType_Input,
-                            report,
-                            size);
+                            &hid_report);
 }
 
 void BluetoothDevice::HandleConnectionEvent(const void* event_data) {
-    const EventInfo* info = static_cast<const EventInfo*>(event_data);
-    m_connected_address = info->connection.address;
+    const BtdrvEventInfo* info = static_cast<const BtdrvEventInfo*>(event_data);
+    // В зависимости от версии прошивки, адрес находится в разных местах
+    #if SWITCH_FIRMWARE >= MAKEFIRMVER(12,0,0)
+        m_connected_address = info->inquiry_device.v12.addr;
+    #else
+        m_connected_address = info->inquiry_device.v1.addr;
+    #endif
     m_connected = true;
 }
 
@@ -236,15 +248,15 @@ void BluetoothDevice::HandleDisconnectionEvent(const void* event_data) {
 }
 
 Result BluetoothDevice::SetupHidProfile() {
-    /*
-            BtdrvAddress - адрес устройства
-        BtdrvBluetoothHhReportType - тип отчета (Input в нашем случае)
-        const void* - указатель на данные
-        size_t - размер данных 
-    
-    */
+    // Создаем HID репорт с дескриптором
+    BtdrvHidReport hid_descriptor = {};
+    hid_descriptor.size = sizeof(HID_DESCRIPTOR);
+    if (sizeof(HID_DESCRIPTOR) > sizeof(hid_descriptor.data)) {
+        return -1;
+    }
+    memcpy(hid_descriptor.data, HID_DESCRIPTOR, sizeof(HID_DESCRIPTOR)); //копируем данные дискриптора в структуру
+
     return btdrvSetHidReport(m_connected_address, 
-                            BtdrvBluetoothHhReportType_Input,
-                            HID_DESCRIPTOR,
-                            sizeof(HID_DESCRIPTOR));
+                            BtdrvBluetoothHhReportType_Feature,
+                            &hid_descriptor);
 }

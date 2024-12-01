@@ -1,6 +1,10 @@
 #pragma once
 #include <switch.h>
 
+// Определяем версию прошивки
+#define MAKEFIRMVER(major, minor, micro) ((major << 16) | (minor << 8) | (micro))
+#define SWITCH_FIRMWARE MAKEFIRMVER(12,0,0)  // Используем последнюю версию
+
 // Основные типы из libnx
 using Address = ::BtdrvAddress;
 using DeviceClass = ::BtdrvClassOfDevice;
