@@ -1,6 +1,7 @@
 #include "bluetooth_device.hpp"
 #include <switch.h>
-#include <cstring>  // для memcpy
+#include <cstring>// для memcpy
+#include <stdio.h> 
 
 namespace {
     // HID дескриптор для геймпада
@@ -43,38 +44,75 @@ BluetoothDevice::~BluetoothDevice() {
     Finalize();
 }
 
+
 Result BluetoothDevice::Initialize() {
     if (m_initialized) {
         return 0;
     }
 
-    Result rc;
+   Result rc = smInitialize();
+    if (R_FAILED(rc)) {
+        printf("Failed to initialize sm: %x\n", rc);
+        return rc;
+    }
+
+    // Запрашиваем права на использование Bluetooth
+    rc = setsysInitialize();
+    if (R_SUCCEEDED(rc)) {
+        SetSysFirmwareVersion fw;
+        rc = setsysGetFirmwareVersion(&fw);
+        if (R_SUCCEEDED(rc)) {
+            printf("Firmware version: %u.%u.%u\n", fw.major, fw.minor, fw.micro);
+        }
+        setsysExit();
+    }
 
     // Инициализируем Bluetooth стек
+    rc = btdrvInitialize();
+    if (R_FAILED(rc)) {
+        printf("Failed to initialize btdrv: %x\n", rc);
+        smExit();
+        return rc;
+    }
+
+    // Инициализируем Bluetooth
     rc = InitializeBluetooth();
     if (R_FAILED(rc)) {
+        printf("Failed to initialize inside BluetoothDevice: %x\n", rc);
+        btdrvExit();
+        smExit();
         return rc;
     }
 
     // Включаем Bluetooth
     rc = EnableBluetooth();
     if (R_FAILED(rc)) {
+        printf("Failed to enable Bluetooth: %x\n", rc);
+        btdrvExit();
+        smExit();
         return rc;
     }
 
     // Настраиваем режим устройства
     rc = SetupDeviceMode();
     if (R_FAILED(rc)) {
+        printf("Failed to setup device mode: %x\n", rc);
+        btdrvExit();
+        smExit();
         return rc;
     }
 
     // Настраиваем HID профиль
     rc = SetupHidProfile();
     if (R_FAILED(rc)) {
+        printf("Failed to setup HID profile: %x\n", rc);
+        btdrvExit();
+        smExit();
         return rc;
     }
 
     m_initialized = true;
+    printf("Bluetooth initialization SUCCESS: %x\n", rc);
     return 0;
 }
 
@@ -99,6 +137,7 @@ Result BluetoothDevice::InitializeBluetooth() {
     // Инициализируем HID стек с буфером для событий
     Result rc = btdrvInitializeHid(&m_event_buffer[0]);
     if (R_FAILED(rc)) {
+        printf("Failed to initialize HID: %x\n", rc);
         return rc;
     }
 
@@ -106,6 +145,7 @@ Result BluetoothDevice::InitializeBluetooth() {
     while (true) {
         rc = eventWait(&m_event_buffer[0], UINT64_MAX);
         if (R_FAILED(rc)) {
+            printf("Failed to wait for event: %x\n", rc);
             return rc;
         }
 
@@ -187,9 +227,9 @@ Result BluetoothDevice::WaitForConnection() {
         }
 
         // Проверяем тип события
-        BtdrvEventInfo event_info;
+        BtdrvEventInfo event_info = {};
         BtdrvEventType event_type;
-        rc = btdrvGetEventInfo(nullptr, &event_info, &event_type);
+        rc = btdrvGetEventInfo(&event_info, sizeof(event_info), &event_type);
         if (R_FAILED(rc)) {
             return rc;
         }
@@ -215,19 +255,31 @@ Result BluetoothDevice::Disconnect() {
 }
 
 Result BluetoothDevice::SendReport(const uint8_t* report, size_t size) {
-    if (!m_initialized || !m_connected) {
+    if (!m_connected) {
         return -1;
     }
 
+    // Создаем HID репорт
+    BtdrvHidReport hid_report = {};
+    hid_report.size = size;
+    if (size > sizeof(hid_report.data)) {
+        return -1;
+    }
+    memcpy(hid_report.data, report, size);
+
     return btdrvSetHidReport(m_connected_address, 
                             BtdrvBluetoothHhReportType_Input,
-                            report,
-                            size);
+                            &hid_report);
 }
 
 void BluetoothDevice::HandleConnectionEvent(const void* event_data) {
-    const EventInfo* info = static_cast<const EventInfo*>(event_data);
-    m_connected_address = info->connection.address;
+    const BtdrvEventInfo* info = static_cast<const BtdrvEventInfo*>(event_data);
+    // В зависимости от версии прошивки, адрес находится в разных местах
+    #if SWITCH_FIRMWARE >= MAKEFIRMVER(12,0,0)
+        m_connected_address = info->inquiry_device.v12.addr;
+    #else
+        m_connected_address = info->inquiry_device.v1.addr;
+    #endif
     m_connected = true;
 }
 
@@ -236,15 +288,15 @@ void BluetoothDevice::HandleDisconnectionEvent(const void* event_data) {
 }
 
 Result BluetoothDevice::SetupHidProfile() {
-    /*
-            BtdrvAddress - адрес устройства
-        BtdrvBluetoothHhReportType - тип отчета (Input в нашем случае)
-        const void* - указатель на данные
-        size_t - размер данных 
-    
-    */
+    // Создаем HID репорт с дескриптором
+    BtdrvHidReport hid_descriptor = {};
+    hid_descriptor.size = sizeof(HID_DESCRIPTOR);
+    if (sizeof(HID_DESCRIPTOR) > sizeof(hid_descriptor.data)) {
+        return -1;
+    }
+    memcpy(hid_descriptor.data, HID_DESCRIPTOR, sizeof(HID_DESCRIPTOR)); //копируем данные дискриптора в структуру
+
     return btdrvSetHidReport(m_connected_address, 
-                            BtdrvBluetoothHhReportType_Input,
-                            HID_DESCRIPTOR,
-                            sizeof(HID_DESCRIPTOR));
+                            BtdrvBluetoothHhReportType_Feature,
+                            &hid_descriptor);
 }
