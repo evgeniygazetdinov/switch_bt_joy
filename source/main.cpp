@@ -58,15 +58,15 @@ bool mainLoop() {
         padUpdate(&pad);
         u64 kDown = padGetButtonsDown(&pad);
 
-        if (kDown & kDown == KEY_MINUS) {
+        if (kDown & KEY_MINUS) {
             return false;
         }
 
-        if (kDown & HidNpadButton_B) {
+        if (kDown & KEY_B) {
             printf("Initializing Bluetooth...\n");
             Result rc = device.Initialize();
             if (R_FAILED(rc)) {
-                printf("Failed to initialize Bluetooth: %x\n", rc);
+                printf("Failed to initialize begining Bluetooth: %x\n", rc);
                 continue;
             }
 

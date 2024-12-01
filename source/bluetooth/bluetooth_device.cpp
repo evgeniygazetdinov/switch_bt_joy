@@ -1,7 +1,7 @@
 #include "bluetooth_device.hpp"
 #include <switch.h>
 #include <cstring>// для memcpy
-#include <stdio.h>  
+#include <stdio.h> 
 
 namespace {
     // HID дескриптор для геймпада
@@ -44,15 +44,43 @@ BluetoothDevice::~BluetoothDevice() {
     Finalize();
 }
 
+
 Result BluetoothDevice::Initialize() {
     if (m_initialized) {
         return 0;
     }
 
-    // Инициализируем Bluetooth стек
-    Result rc = InitializeBluetooth();
+   Result rc = smInitialize();
     if (R_FAILED(rc)) {
-        printf("Failed to initialize Bluetooth: %x\n", rc);
+        printf("Failed to initialize sm: %x\n", rc);
+        return rc;
+    }
+
+    // Запрашиваем права на использование Bluetooth
+    rc = setsysInitialize();
+    if (R_SUCCEEDED(rc)) {
+        SetSysFirmwareVersion fw;
+        rc = setsysGetFirmwareVersion(&fw);
+        if (R_SUCCEEDED(rc)) {
+            printf("Firmware version: %u.%u.%u\n", fw.major, fw.minor, fw.micro);
+        }
+        setsysExit();
+    }
+
+    // Инициализируем Bluetooth стек
+    rc = btdrvInitialize();
+    if (R_FAILED(rc)) {
+        printf("Failed to initialize btdrv: %x\n", rc);
+        smExit();
+        return rc;
+    }
+
+    // Инициализируем Bluetooth
+    rc = InitializeBluetooth();
+    if (R_FAILED(rc)) {
+        printf("Failed to initialize inside BluetoothDevice: %x\n", rc);
+        btdrvExit();
+        smExit();
         return rc;
     }
 
@@ -60,26 +88,31 @@ Result BluetoothDevice::Initialize() {
     rc = EnableBluetooth();
     if (R_FAILED(rc)) {
         printf("Failed to enable Bluetooth: %x\n", rc);
-
+        btdrvExit();
+        smExit();
         return rc;
     }
 
     // Настраиваем режим устройства
     rc = SetupDeviceMode();
     if (R_FAILED(rc)) {
-        printf("Failed to setup Bluetooth: %x\n", rc);
+        printf("Failed to setup device mode: %x\n", rc);
+        btdrvExit();
+        smExit();
         return rc;
     }
 
     // Настраиваем HID профиль
     rc = SetupHidProfile();
     if (R_FAILED(rc)) {
-        printf("Failed to setup Bluetooth: %x\n", rc);
+        printf("Failed to setup HID profile: %x\n", rc);
+        btdrvExit();
+        smExit();
         return rc;
     }
 
     m_initialized = true;
-    printf("SUCCESS: %x\n", rc);
+    printf("Bluetooth initialization SUCCESS: %x\n", rc);
     return 0;
 }
 
