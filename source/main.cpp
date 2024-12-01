@@ -65,10 +65,10 @@ bool mainLoop() {
         if (kDown & KEY_B) {
             printf("Initializing Bluetooth...\n");
             Result rc = device.Initialize();
-            if (R_FAILED(rc)) {
-                printf("Failed to initialize begining Bluetooth: %x\n", rc);
-                continue;
-            }
+            // if (R_FAILED(rc)) {
+            //     printf("Failed to initialize begining Bluetooth: %x\n", rc);
+            //     continue;
+            // }
 
         }
 
@@ -150,7 +150,6 @@ int main(int argc, char* argv[]) {
     // Инициализация консоли
 
 	consoleInit(NULL);
-        printf("Initializing console...\n");
     mainLoop();
     consoleExit(NULL);
     return 0;

@@ -47,72 +47,66 @@ BluetoothDevice::~BluetoothDevice() {
 
 Result BluetoothDevice::Initialize() {
     if (m_initialized) {
+        printf("Device already initialized\n");
         return 0;
     }
 
-   Result rc = smInitialize();
+    printf("Starting initialization...\n");
+    Result rc = 0;
+
+    // Запрашиваем права на использование Bluetooth через setsys
+    printf("Initializing setsys service...\n");
+    rc = setsysInitialize();
     if (R_FAILED(rc)) {
-        printf("Failed to initialize sm: %x\n", rc);
+        printf("Failed to initialize setsys: %x\n", rc);
         return rc;
     }
 
-    // Запрашиваем права на использование Bluetooth
-    rc = setsysInitialize();
+    // Получаем версию прошивки для отладки
+    SetSysFirmwareVersion fw;
+    rc = setsysGetFirmwareVersion(&fw);
     if (R_SUCCEEDED(rc)) {
-        SetSysFirmwareVersion fw;
-        rc = setsysGetFirmwareVersion(&fw);
-        if (R_SUCCEEDED(rc)) {
-            printf("Firmware version: %u.%u.%u\n", fw.major, fw.minor, fw.micro);
-        }
-        setsysExit();
+        printf("Firmware version: %u.%u.%u\n", fw.major, fw.minor, fw.micro);
     }
+    setsysExit();
 
     // Инициализируем Bluetooth стек
-    rc = btdrvInitialize();
-    if (R_FAILED(rc)) {
-        printf("Failed to initialize btdrv: %x\n", rc);
-        smExit();
-        return rc;
-    }
-
-    // Инициализируем Bluetooth
+    printf("Initializing Bluetooth stack...\n");
     rc = InitializeBluetooth();
     if (R_FAILED(rc)) {
-        printf("Failed to initialize inside BluetoothDevice: %x\n", rc);
-        btdrvExit();
-        smExit();
+        printf("Failed to initialize Bluetooth stack: %x\n", rc);
         return rc;
     }
 
     // Включаем Bluetooth
+    printf("Enabling Bluetooth...\n");
     rc = EnableBluetooth();
     if (R_FAILED(rc)) {
         printf("Failed to enable Bluetooth: %x\n", rc);
         btdrvExit();
-        smExit();
         return rc;
     }
 
     // Настраиваем режим устройства
+    printf("Setting up device mode...\n");
     rc = SetupDeviceMode();
     if (R_FAILED(rc)) {
         printf("Failed to setup device mode: %x\n", rc);
         btdrvExit();
-        smExit();
         return rc;
     }
 
     // Настраиваем HID профиль
+    printf("Setting up HID profile...\n");
     rc = SetupHidProfile();
     if (R_FAILED(rc)) {
         printf("Failed to setup HID profile: %x\n", rc);
         btdrvExit();
-        smExit();
         return rc;
     }
 
     m_initialized = true;
-    printf("Bluetooth initialization SUCCESS: %x\n", rc);
+    printf("Initialization completed successfully\n");
     return 0;
 }
 
@@ -134,25 +128,57 @@ void BluetoothDevice::Finalize() {
 }
 
 Result BluetoothDevice::InitializeBluetooth() {
-    // Инициализируем HID стек с буфером для событий
-    Result rc = btdrvInitializeHid(&m_event_buffer[0]);
+    printf("Starting Bluetooth initialization...\n");
+    
+    // Инициализируем основной Bluetooth сервис
+    Result rc = btdrvInitialize();
     if (R_FAILED(rc)) {
-        printf("Failed to initialize HID: %x\n", rc);
+        printf("Failed to initialize btdrv: %x\n", rc);
         return rc;
     }
-
-    // Ждем события инициализации
-    while (true) {
-        rc = eventWait(&m_event_buffer[0], UINT64_MAX);
+    
+    // Проверяем состояние Bluetooth
+    bool enabled = false;
+    rc = btdrvGetBluetoothState(&enabled);
+    if (R_FAILED(rc)) {
+        printf("Failed to get Bluetooth state: %x\n", rc);
+        btdrvExit();
+        return rc;
+    }
+    
+    if (!enabled) {
+        printf("Bluetooth is disabled, enabling...\n");
+        rc = btdrvEnableBluetoothAsync();
         if (R_FAILED(rc)) {
-            printf("Failed to wait for event: %x\n", rc);
+            printf("Failed to enable Bluetooth: %x\n", rc);
+            btdrvExit();
             return rc;
         }
-
-        // Событие получено, можно продолжать
-        break;
+        
+        // Ждем включения Bluetooth
+        svcSleepThread(1000000000ULL); // 1 секунда
     }
-
+    
+    // Инициализируем HID стек
+    printf("Initializing HID stack...\n");
+    rc = btdrvInitializeHid(&m_event_buffer[0]);
+    if (R_FAILED(rc)) {
+        printf("Failed to initialize HID (error %x). Make sure you have the required permissions.\n", rc);
+        btdrvExit();
+        return rc;
+    }
+    
+    // Ждем события инициализации HID
+    printf("Waiting for HID initialization event...\n");
+    rc = eventWait(&m_event_buffer[0], 5000000000ULL); // 5 секунд таймаут
+    if (R_FAILED(rc)) {
+        printf("Failed to wait for HID event: %x\n", rc);
+        btdrvFinalizeHid();
+        btdrvExit();
+        return rc;
+    }
+    
+    printf("Bluetooth initialization completed successfully\n");
     return rc;
 }
 
