@@ -41,6 +41,8 @@ const int KEY_MINUS = 2048;
 bool mainLoop() {
     printf("\n\n-------- Main Menu --------\n");
     printf("Press B to initialize Bluetooth\n");
+    printf("Press X to start waiting for connection\n");
+    printf("Press Y to stop waiting for connection\n");
     printf("Press - to exit\n");
 
     // Создаем Bluetooth устройство
@@ -64,27 +66,28 @@ bool mainLoop() {
 
         if (kDown & KEY_B) {
             printf("Initializing Bluetooth...\n");
-            Result rc = device.Initialize();
-            // if (R_FAILED(rc)) {
-            //     printf("Failed to initialize begining Bluetooth: %x\n", rc);
-            //     continue;
-            // }
-
+            Result result_of_initialize = device.Initialize();
+            if (R_FAILED(result_of_initialize)) {
+                printf("Failed to initialize begining Bluetooth: %x\n", result_of_initialize);
+                continue;
+            }
+            }
+        if(kDown & KEY_X) {
+            printf("Waiting for connection...\n");
+            Result result_of_wait = device.WaitForConnection();
+            if (R_FAILED(result_of_wait)) {
+                printf("Failed to connect: %x\n", result_of_wait);
+                continue;
+            }
         }
 
-    //         printf("Starting advertising...\n");
-    //         rc = device.StartAdvertising();
-    //         if (R_FAILED(rc)) {
-    //             printf("Failed to start advertising: %x\n", rc);
-    //             continue;
-    //         }
+        if(kDown & KEY_Y) {
+            printf("Stopping connection wait...\n");
+            device.StopWaiting();
+        }
 
-    //         printf("Waiting for connection...\n");
-    //         rc = device.WaitForConnection();
-    //         if (R_FAILED(rc)) {
-    //             printf("Failed to connect: %x\n", rc);
-    //             continue;
-    //         }
+           
+        
 
     //         printf("Connected! Press buttons to send HID reports\n");
     //         printf("Press - to disconnect and exit\n");
