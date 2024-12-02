@@ -41,8 +41,8 @@ const int KEY_MINUS = 2048;
 bool mainLoop() {
     printf("\n\n-------- Main Menu --------\n");
     printf("Press B to initialize Bluetooth\n");
-    printf("Press X to start waiting for connection\n");
-    printf("Press Y to stop waiting for connection\n");
+    printf("Press X to start checking for connections\n");
+    printf("Press Y to stop checking for connections\n");
     printf("Press - to exit\n");
 
     // Создаем Bluetooth устройство
@@ -59,8 +59,9 @@ bool mainLoop() {
         // Сканируем ввод
         padUpdate(&pad);
         u64 kDown = padGetButtonsDown(&pad);
-
+        bool checking_connections = false;
         if (kDown & KEY_MINUS) {
+            printf("Exiting...\n");
             return false;
         }
 
@@ -68,82 +69,26 @@ bool mainLoop() {
             printf("Initializing Bluetooth...\n");
             Result result_of_initialize = device.Initialize();
             if (R_FAILED(result_of_initialize)) {
-                printf("Failed to initialize begining Bluetooth: %x\n", result_of_initialize);
+                printf("Failed to initialize Bluetooth: %x\n", result_of_initialize);
                 continue;
             }
-            }
-        if(kDown & KEY_X) {
-            printf("Waiting for connection...\n");
+        }
+
+        if (kDown & KEY_X) {
+            printf("Starting connection check...\n");
+            checking_connections = true;
+        }
+
+        // Проверяем подключения если включено
+        if (checking_connections) {
             Result result_of_wait = device.WaitForConnection();
             if (R_FAILED(result_of_wait)) {
-                printf("Failed to connect: %x\n", result_of_wait);
-                continue;
+                printf("Connection check failed: %x\n", result_of_wait);
+                checking_connections = false;
             }
         }
-
-        if(kDown & KEY_Y) {
-            printf("Stopping connection wait...\n");
-            device.StopWaiting();
-        }
-
-           
-        
-
-    //         printf("Connected! Press buttons to send HID reports\n");
-    //         printf("Press - to disconnect and exit\n");
-
-    //         // Основной цикл отправки HID репортов
-    //         while (appletMainLoop() && device.IsConnected()) {
-    //             padUpdate(&pad);
-    //             kDown = padGetButtonsDown(&pad);
-
-    //             if (kDown & HidNpadButton_Minus) {
-    //                 device.Disconnect();
-    //                 return true;
-    //             }
-
-    //             // Обновляем состояние кнопок
-    //             button_state.buttons = 0;
-    //             if (kDown & HidNpadButton_A) {
-    //                 button_state.buttons |= BUTTON_A;
-    //                 printf("Button A pressed\n");
-    //             }
-    //             if (kDown & HidNpadButton_B) {
-    //                 button_state.buttons |= BUTTON_B;
-    //                 printf("Button B pressed\n");
-    //             }
-    //             if (kDown & HidNpadButton_X) {
-    //                 button_state.buttons |= BUTTON_X;
-    //                 printf("Button X pressed\n");
-    //             }
-    //             if (kDown & HidNpadButton_Y) {
-    //                 button_state.buttons |= BUTTON_Y;
-    //                 printf("Button Y pressed\n");
-    //             }
-    //             if (kDown & HidNpadButton_L) {
-    //                 button_state.buttons |= BUTTON_L;
-    //                 printf("Button L pressed\n");
-    //             }
-    //             if (kDown & HidNpadButton_R) {
-    //                 button_state.buttons |= BUTTON_R;
-    //                 printf("Button R pressed\n");
-    //             }
-    //             if (kDown & HidNpadButton_ZL) {
-    //                 button_state.buttons |= BUTTON_ZL;
-    //                 printf("Button ZL pressed\n");
-    //             }
-    //             if (kDown & HidNpadButton_ZR) {
-    //                 button_state.buttons |= BUTTON_ZR;
-    //                 printf("Button ZR pressed\n");
-    //             }
-
-    //             svcSleepThread(16666667ULL);  // ~60Hz
-    //         }
-    //     }
-
-    //     svcSleepThread(16666667ULL);  // ~60Hz
-
-                    consoleUpdate(NULL);
+        consoleUpdate(NULL);
+        svcSleepThread(100000000ULL); // Спим 100мс чтобы не грузить процессор
     }
 
     return true;
