@@ -41,8 +41,6 @@ const int KEY_MINUS = 2048;
 bool mainLoop() {
     printf("\n\n-------- Main Menu --------\n");
     printf("Press B to initialize Bluetooth\n");
-    printf("Press X to start checking for connections\n");
-    printf("Press Y to stop checking for connections\n");
     printf("Press - to exit\n");
 
     // Создаем Bluetooth устройство
@@ -72,11 +70,10 @@ bool mainLoop() {
                 printf("Failed to initialize Bluetooth: %x\n", result_of_initialize);
                 continue;
             }
-        }
-
-        if (kDown & KEY_X) {
-            printf("Starting connection check...\n");
-            checking_connections = true;
+            else{
+                printf("Starting connection check...\n");
+                checking_connections = true;
+            }
         }
 
         // Проверяем подключения если включено
