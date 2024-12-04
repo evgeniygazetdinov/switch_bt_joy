@@ -64,16 +64,39 @@ Result BluetoothDevice::Initialize() {
         printf("Failed to initialize btdrv: %x\n", rc);
         return rc;
     }
+    printf("btdrv initialized successfully\n");
 
+    // Инициализируем BLE
+    printf("Initializing BLE...\n");
+    rc = btdrvInitializeBle(nullptr);  // Не используем event
+    if (R_FAILED(rc)) {
+        printf("Failed to initialize BLE: %x\n", rc);
+        btdrvExit();
+        return rc;
+    }
+    printf("BLE initialized successfully\n");
+
+    // Включаем BLE режим
+    printf("Enabling BLE...\n");
+    rc = btdrvEnableBle();
+    if (R_FAILED(rc)) {
+        printf("Failed to enable BLE: %x\n", rc);
+        btdrvFinalizeBle();
+        btdrvExit();
+        return rc;
+    }
+    printf("BLE enabled successfully\n");
 
     // Инициализируем HID стек
     printf("Initializing HID stack...\n");
     rc = btdrvInitializeHid(&m_event_buffer[0]);
     if (R_FAILED(rc)) {
         printf("Failed to initialize HID (error %x)\n", rc);
+        btdrvFinalizeBle();
         btdrvExit();
         return rc;
     }
+    printf("HID stack initialized successfully\n");
 
     // Настраиваем HID профиль
     printf("Setting up HID profile...\n");
@@ -81,9 +104,88 @@ Result BluetoothDevice::Initialize() {
     if (R_FAILED(rc)) {
         printf("Failed to setup HID profile: %x\n", rc);
         btdrvFinalizeHid();
+        btdrvFinalizeBle();
         btdrvExit();
         return rc;
     }
+    printf("HID profile setup successfully\n");
+
+    // Делаем устройство видимым и доступным для подключения
+    printf("Making device visible and connectable...\n");
+    rc = btdrvSetBleVisibility(true, true);
+    if (R_FAILED(rc)) {
+        printf("Failed to set visibility: %x\n", rc);
+        btdrvFinalizeHid();
+        btdrvFinalizeBle();
+        btdrvExit();
+        return rc;
+    }
+    printf("Device visibility set successfully\n");
+
+    // Настраиваем параметры рекламы
+    printf("Setting up BLE advertising parameters...\n");
+    BtdrvAddress addr = {0}; // Используем нулевой адрес, система сама назначит
+    rc = btdrvSetBleAdvertiseParameter(addr, 0x0020, 0x0040); // Интервалы: 20ms - 40ms
+    if (R_FAILED(rc)) {
+        printf("Failed to set advertising parameters: %x\n", rc);
+        btdrvFinalizeHid();
+        btdrvFinalizeBle();
+        btdrvExit();
+        return rc;
+    }
+    printf("Advertising parameters set successfully\n");
+
+    // Настраиваем данные рекламы
+    printf("Setting up BLE advertising data...\n");
+    BtdrvBleAdvertisePacketData adv_data = {0}; // Обнуляем всю структуру
+
+    // Основные данные рекламы в unk_x6
+    // Формат: [длина][тип][данные]
+    const char* device_name = "Switch joystick";
+    uint8_t name_len = strlen(device_name);
+
+    // 1. Flags (3 байта)
+    adv_data.unk_x6[0] = 2;    // Длина первого поля (flags)
+    adv_data.unk_x6[1] = 0x01; // Тип: Flags
+    adv_data.unk_x6[2] = 0x06; // Flags: LE General Discoverable + BR/EDR Not Supported
+
+    // 2. UUID сервиса (4 байта)
+    adv_data.unk_x6[3] = 3;    // Длина второго поля (UUID)
+    adv_data.unk_x6[4] = 0x03; // Тип: Complete List of 16-bit Service UUIDs
+    adv_data.unk_x6[5] = 0x12; // UUID: Human Interface Device (0x1812), младший байт
+    adv_data.unk_x6[6] = 0x18; // UUID: Human Interface Device (0x1812), старший байт
+
+    // 3. Имя устройства (длина + 2 байта)
+    adv_data.unk_x6[7] = name_len + 1;  // Длина имени + 1 байт на тип
+    adv_data.unk_x6[8] = 0x09;          // Тип: Complete Local Name
+    memcpy(&adv_data.unk_x6[9], device_name, name_len);
+
+    // Общий размер: flags(3) + uuid(4) + name_header(2) + name_len
+    adv_data.size0 = 9 + name_len;
+
+    // Дополнительные данные в unk_xA8 (если нужно)
+    adv_data.size2 = 0;  // Пока не используем
+
+    // Не используем entries
+    adv_data.count = 0;
+
+    printf("Advertising data size: %d bytes\n", adv_data.size0);
+    printf("Data dump: ");
+    for(int i = 0; i < adv_data.size0; i++) {
+        printf("%02x ", adv_data.unk_x6[i]);
+    }
+    printf("\n");
+
+    rc = btdrvSetBleAdvertiseData(&adv_data);
+    if (R_FAILED(rc)) {
+        printf("Failed to set advertising data: %x\n", rc);
+        btdrvFinalizeHid();
+        btdrvExit();
+        return rc;
+    }
+    printf("Advertising data set successfully\n");
+
+
 
     m_initialized = true;
     printf("Initialization completed successfully\n");
@@ -104,45 +206,6 @@ void BluetoothDevice::Finalize() {
     m_initialized = false;
 }
 
-Result BluetoothDevice::InitializeBluetooth() {
-    printf("Starting Bluetooth initialization...\n");
-    
-    // Инициализируем основной Bluetooth сервис
-    Result rc = btdrvInitialize();
-    if (R_FAILED(rc)) {
-        printf("Failed to initialize btdrv: %x\n", rc);
-        return rc;
-    }
-    
-    // Включаем Bluetooth
-    // printf("Enabling Bluetooth...\n");
-    // rc = btdrvEnableBluetooth();
-    // if (R_FAILED(rc)) {
-    //     printf("Failed to enable Bluetooth: %x\n", rc);
-    //     btdrvExit();
-    //     return rc;
-    // }
-    
-    // Ждем включения Bluetooth
-    // printf("Waiting for Bluetooth to initialize...\n");
-    // svcSleepThread(1000000000ULL); // Ждем 1 секунду
-    
-    // Инициализируем HID стек
-    // printf("Initializing HID stack...\n");
-    // rc = btdrvInitializeHid(&m_event_buffer[0]);
-    // if (R_FAILED(rc)) {
-    //     printf("Failed to initialize HID (error %x). Make sure you have the required permissions.\n", rc);
-    //     btdrvDisableBluetooth();
-    //     btdrvExit();
-    //     return rc;
-    // }
-    
-    // // Даем время на инициализацию HID
-    // svcSleepThread(1000000000ULL); // 1 секунда
-    
-    printf("Bluetooth initialization completed successfully\n");
-    return rc;
-}
 
 Result BluetoothDevice::EnableBluetooth() {
     // Включаем HID режим
@@ -183,37 +246,29 @@ Result BluetoothDevice::WaitForConnection() {
         return -1;
     }
 
-    m_waiting = true;  // Начинаем ожидание
-
-    // Ждем события подключения
-    while (!m_connected && m_waiting) {  // Проверяем флаг
-        printf("Waiting for connection...inside \n");
-        Result rc = eventWait(&m_event_buffer[0], 1000000000ULL); // 1 секунда
-        if (R_FAILED(rc)) {
-            if (rc == 0xEA01) { // Timeout
-                continue; // Просто продолжаем ждать
-            }
-            m_waiting = false;
-            return rc; // Другая ошибка
+    // Проверяем события Bluetooth
+    Result rc = eventWait(&m_event_buffer[0], 0); // Неблокирующий вызов
+    if (R_FAILED(rc)) {
+        if (rc == 0xEA01) { // Timeout - это нормально для неблокирующего режима
+            return 0;
         }
-
-        // Проверяем тип события
-        BtdrvEventInfo event_info = {};
-        BtdrvEventType event_type;
-        rc = btdrvGetEventInfo(&event_info, sizeof(event_info), &event_type);
-        if (R_FAILED(rc)) {
-            m_waiting = false;
-            return rc;
-        }
-
-        if (event_type == BtdrvEventType_Connection) {
-            HandleConnectionEvent(&event_info);
-            printf("Connected\n");
-        }
+        return rc;
     }
 
-    m_waiting = false;  // Заканчиваем ожидание
-    return m_connected ? 0 : -1;  // Возвращаем успех только если подключились
+    // Проверяем тип события
+    BtdrvEventInfo event_info = {};
+    BtdrvEventType event_type;
+    rc = btdrvGetEventInfo(&event_info, sizeof(event_info), &event_type);
+    if (R_FAILED(rc)) {
+        return rc;
+    }
+
+    if (event_type == BtdrvEventType_Connection) {
+        HandleConnectionEvent(&event_info);
+        printf("Connected\n");
+    }
+
+    return 0;
 }
 
 Result BluetoothDevice::Disconnect() {
