@@ -33,7 +33,6 @@ public:
 
 private:
     // Методы для работы с Bluetooth
-    Result InitializeBluetooth();
     Result EnableBluetooth();
     Result SetupDeviceMode();
     Result SetupHidProfile();

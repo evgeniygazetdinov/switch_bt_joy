@@ -4,6 +4,6 @@
 *.o
 build/
 MissionControl/
-.vscode/
+.vscode/**/
 .idea/
 .map
