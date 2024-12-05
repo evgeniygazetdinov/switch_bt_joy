@@ -31,6 +31,7 @@ public:
     // Отправка HID репорта
     Result SendReport(const uint8_t* report, size_t size);
 
+
 private:
     // Методы для работы с Bluetooth
     Result EnableBluetooth();
