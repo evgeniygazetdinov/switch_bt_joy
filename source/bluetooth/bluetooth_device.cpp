@@ -66,26 +66,18 @@ Result BluetoothDevice::Initialize() {
     }
     printf("btdrv initialized successfully\n");
 
-    // Инициализируем BLE
-    printf("Initializing BLE...\n");
-    rc = btdrvInitializeBle(nullptr);  // Не используем event
+    // Получаем MAC адрес адаптера
+    BtdrvAdapterProperty props;
+    BtdrvAdapterPropertyType type;
+    rc = btdrvGetAdapterProperty(type, &props);
     if (R_FAILED(rc)) {
-        printf("Failed to initialize BLE: %x\n", rc);
+        printf("Failed to get adapter properties: %x\n", rc);
         btdrvExit();
         return rc;
     }
-    printf("BLE initialized successfully\n");
-
-    // Включаем BLE режим
-    printf("Enabling BLE...\n");
-    rc = btdrvEnableBle();
-    if (R_FAILED(rc)) {
-        printf("Failed to enable BLE: %x\n", rc);
-        btdrvFinalizeBle();
-        btdrvExit();
-        return rc;
-    }
-    printf("BLE enabled successfully\n");
+    printf("Bluetooth MAC address: %02x:%02x:%02x:%02x:%02x:%02x\n",
+           props.data[5], props.data[4], props.data[3],
+           props.data[2], props.data[1], props.data[0]);
 
     // Инициализируем HID стек
     printf("Initializing HID stack...\n");
