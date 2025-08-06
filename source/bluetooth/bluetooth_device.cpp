@@ -1,49 +1,13 @@
+// bluetooth_device.cpp
 #include "bluetooth_device.hpp"
-#include <switch.h>
-#include <cstring>// для memcpy
-#include <stdio.h> 
+#include <cstring>
+#include <stdio.h>
 
-
-namespace {
-    // HID дескриптор для геймпада
-    constexpr uint8_t HID_DESCRIPTOR[] = {
-        0x05, 0x01,        // Usage Page (Generic Desktop Ctrls)
-        0x09, 0x05,        // Usage (Game Pad)
-        0xA1, 0x01,        // Collection (Application)
-        0x85, 0x01,        //   Report ID (1)
-        0x05, 0x09,        //   Usage Page (Button)
-        0x19, 0x01,        //   Usage Minimum (Button 1)
-        0x29, 0x08,        //   Usage Maximum (Button 8)
-        0x15, 0x00,        //   Logical Minimum (0)
-        0x25, 0x01,        //   Logical Maximum (1)
-        0x75, 0x01,        //   Report Size (1)
-        0x95, 0x08,        //   Report Count (8)
-        0x81, 0x02,        //   Input (Data,Var,Abs)
-        0x05, 0x01,        //   Usage Page (Generic Desktop Ctrls)
-        0x09, 0x30,        //   Usage (X)
-        0x09, 0x31,        //   Usage (Y)
-        0x15, 0x81,        //   Logical Minimum (-127)
-        0x25, 0x7F,        //   Logical Maximum (127)
-        0x75, 0x08,        //   Report Size (8)
-        0x95, 0x02,        //   Report Count (2)
-        0x81, 0x02,        //   Input (Data,Var,Abs)
-        0xC0              // End Collection
-    };
-
-    constexpr uint8_t BLE_ADVERTISEMENT_DATA[] = {
-        // Данные рекламы BLE
-    };
-
-    constexpr uint16_t VENDOR_ID = 0x0F0D;  // HORI
-    constexpr uint16_t PRODUCT_ID = 0x0092; // HORIPAD
-    constexpr uint16_t VERSION = 0x0100;    // v1.0
-}
-
-
-BluetoothDevice::BluetoothDevice() 
-    : m_initialized(false)
-    , m_connected(false)
-    , m_waiting(false) {
+BluetoothDevice::BluetoothDevice() : 
+    m_handle{0},
+    m_initialized(false),
+    m_connected(false) 
+{
 }
 
 BluetoothDevice::~BluetoothDevice() {
@@ -52,258 +16,91 @@ BluetoothDevice::~BluetoothDevice() {
 
 Result BluetoothDevice::Initialize() {
     if (m_initialized) {
-        printf("Device already initialized\n");
         return 0;
     }
 
-    printf("Starting initialization...\n");
-    Result rc = 0;
-
-    // Инициализируем основной Bluetooth сервис
-    printf("Initializing btdrv service...\n");
-    rc = btdrvInitialize();
+    Result rc = hiddbgInitialize();
     if (R_FAILED(rc)) {
-        printf("Failed to initialize btdrv: %x\n", rc);
+        printf("Failed to initialize hiddbg: 0x%x\n", rc);
         return rc;
     }
-    printf("btdrv initialized successfully\n");
 
-    // Получаем MAC адрес адаптера
-    BtdrvAdapterProperty props;
-    BtdrvAdapterPropertyType type;
-    rc = btdrvGetAdapterProperty(type, &props);
+    // Создаем и инициализируем структуру
+    HiddbgHdlsDeviceInfo device_info = {0};
+
+    // Устанавливаем тип устройства (FullKey3 - Pro Controller)
+    device_info.deviceType = HidDeviceType_FullKey3;
+
+    // Устанавливаем тип интерфейса (Bluetooth)
+    device_info.npadInterfaceType = HidNpadInterfaceType_Bluetooth;
+
+    // Устанавливаем цвета контроллера
+    device_info.singleColorBody = RGBA8_MAXALPHA(255, 255, 255);      // Белый корпус
+    device_info.singleColorButtons = RGBA8_MAXALPHA(0, 0, 0);         // Черные кнопки
+    device_info.colorLeftGrip = RGBA8_MAXALPHA(230, 255, 0);          // Цвет левой рукоятки
+    device_info.colorRightGrip = RGBA8_MAXALPHA(0, 40, 20);           // Цвет правой рукоятки
+
+    // Дополнительно для [9.0.0+] можно установить тип контроллера Npad
+    // device_info.npadControllerType = NpadControllerType_ProController;
+
+    // Теперь вызываем функцию с правильно инициализированной структурой
+    rc = hiddbgAttachHdlsVirtualDevice(&m_handle, &device_info);
+
     if (R_FAILED(rc)) {
-        printf("Failed to get adapter properties: %x\n", rc);
-        btdrvExit();
+        printf("Failed to attach virtual device: 0x%x\n", rc);
+        hiddbgExit();
         return rc;
     }
-    printf("Bluetooth MAC address: %02x:%02x:%02x:%02x:%02x:%02x\n",
-           props.data[5], props.data[4], props.data[3],
-           props.data[2], props.data[1], props.data[0]);
-
-    // Инициализируем HID стек
-    printf("Initializing HID stack...\n");
-    rc = btdrvInitializeHid(&m_event_buffer[0]);
-    if (R_FAILED(rc)) {
-        printf("Failed to initialize HID (error %x)\n", rc);
-        btdrvFinalizeBle();
-        btdrvExit();
-        return rc;
-    }
-    printf("HID stack initialized successfully\n");
-
-    // Настраиваем HID профиль
-    printf("Setting up HID profile...\n");
-    rc = SetupHidProfile();
-    if (R_FAILED(rc)) {
-        printf("Failed to setup HID profile: %x\n", rc);
-        btdrvFinalizeHid();
-        btdrvFinalizeBle();
-        btdrvExit();
-        return rc;
-    }
-    printf("HID profile setup successfully\n");
-
-    // Делаем устройство видимым и доступным для подключения
-    printf("Making device visible and connectable...\n");
-    rc = btdrvSetBleVisibility(true, true);
-    if (R_FAILED(rc)) {
-        printf("Failed to set visibility: %x\n", rc);
-        btdrvFinalizeHid();
-        btdrvFinalizeBle();
-        btdrvExit();
-        return rc;
-    }
-    printf("Device visibility set successfully\n");
-
-    // Настраиваем параметры рекламы
-    printf("Setting up BLE advertising parameters...\n");
-    BtdrvAddress addr = {0}; // Используем нулевой адрес, система сама назначит
-    rc = btdrvSetBleAdvertiseParameter(addr, 0x0020, 0x0040); // Интервалы: 20ms - 40ms
-    if (R_FAILED(rc)) {
-        printf("Failed to set advertising parameters: %x\n", rc);
-        btdrvFinalizeHid();
-        btdrvFinalizeBle();
-        btdrvExit();
-        return rc;
-    }
-    printf("Advertising parameters set successfully\n");
-
-    // Настраиваем данные рекламы
-    printf("Setting up BLE advertising data...\n");
-    BtdrvBleAdvertisePacketData adv_data = {0}; // Обнуляем всю структуру
-
-    adv_data.flag = 0x06; // LE General Discoverable + BR/EDR Not Supported
-    adv_data.num_service = 1;
-    // 0x1812 (HID) в little-endian
-    adv_data.uuid_val[0].uuid[0] = 0x12;
-    adv_data.uuid_val[0].uuid[1] = 0x18;
-    for (int i = 2; i < 16; ++i) adv_data.uuid_val[0].uuid[i] = 0;
-    adv_data.adv_data_mask |= BtdrvBleAdBit_Service;
-    
-
-    rc = btdrvSetBleAdvertiseData(&adv_data);
-    if (R_FAILED(rc)) {
-        printf("Failed to set advertising data: %x\n", rc);
-        btdrvFinalizeHid();
-        btdrvExit();
-        return rc;
-    }
-    printf("Advertising data set successfully\n");
-
-
 
     m_initialized = true;
-    printf("Initialization completed successfully\n");
-    return 0;
-}
-
-void BluetoothDevice::Finalize() {
-    if (!m_initialized) {
-        return;
-    }
-
-    if (m_connected) {
-        Disconnect();
-    }
-
-    btdrvFinalizeHid();
-    btdrvExit();
-    m_initialized = false;
-}
-
-
-Result BluetoothDevice::EnableBluetooth() {
-    // Включаем HID режим
-    Result rc = btdrvEnableBle();
-    if (R_FAILED(rc)) {
-        return rc;
-    }
-
-    // Ждем события включения
-    while (true) {
-        rc = eventWait(&m_event_buffer[0], UINT64_MAX);
-        if (R_FAILED(rc)) {
-            return rc;
-        }
-
-        // Событие получено, можно продолжать
-        break;
-    }
-
     return rc;
 }
 
-Result BluetoothDevice::SetupDeviceMode() {
-    // Настраиваем параметры BLE устройства
-    BtdrvBleConnectionParameter param = {};
-    param.min_conn_interval = 0x18;    // 30ms
-    param.max_conn_interval = 0x28;    // 50ms
-    param.scan_interval = 0x100;       // 160ms
-    param.scan_window = 0x100;         // 160ms
-    param.slave_latency = 0;
-    param.supervision_tout = 0x1F4;    // 5000ms
-    
-    return btdrvSetBleDefaultConnectionParameter(&param);
-}
-
 Result BluetoothDevice::WaitForConnection() {
-    if (!m_initialized || m_connected) {
-        return -1;
+    if (!m_initialized) {
+        return MAKERESULT(Module_Libnx, LibnxError_NotInitialized);
     }
 
-    // Проверяем события Bluetooth
-    Result rc = eventWait(&m_event_buffer[0], 0); // Неблокирующий вызов
-    if (R_FAILED(rc)) {
-        if (rc == 0xEA01) { // Timeout - это нормально для неблокирующего режима
-            return 0;
-        }
-        return rc;
-    }
-
-    // Проверяем тип события
-    BtdrvEventInfo event_info = {};
-    BtdrvEventType event_type;
-    rc = btdrvGetEventInfo(&event_info, sizeof(event_info), &event_type);
-    if (R_FAILED(rc)) {
-        return rc;
-    }
-
-    if (event_type == BtdrvEventType_Connection) {
-        HandleConnectionEvent(&event_info);
-        printf("Connected\n");
-    }
-
+    m_connected = true;
     return 0;
 }
 
 Result BluetoothDevice::Disconnect() {
-    if (!m_initialized || !m_connected) {
-        return -1;
+    if (!m_connected) {
+        return 0;
     }
 
-    Result rc = btdrvCloseHidConnection(m_connected_address);
-    if (R_SUCCEEDED(rc)) {
-        m_connected = false;
-    }
-    return rc;
+    m_connected = false;
+    return 0;
 }
 
 Result BluetoothDevice::SendReport(const uint8_t* report, size_t size) {
     if (!m_connected) {
-        return -1;
+        return MAKERESULT(Module_Libnx, LibnxError_NotInitialized);
     }
 
-    // Создаем HID репорт
-    BtdrvHidReport hid_report = {};
-    hid_report.size = size;
+    struct {
+        uint8_t data[64];
+        size_t size;
+    } hid_report;
+
     if (size > sizeof(hid_report.data)) {
-        return -1;
+        return MAKERESULT(Module_Libnx, LibnxError_BadInput);
     }
+    
     memcpy(hid_report.data, report, size);
+    hid_report.size = size;
 
-    return btdrvSetHidReport(m_connected_address, 
-                            BtdrvBluetoothHhReportType_Input,
-                            &hid_report);
+    return hiddbgSetHdlsState(m_handle, (const HiddbgHdlsState*)&hid_report);
 }
 
-void BluetoothDevice::HandleConnectionEvent(const void* event_data) {
-    const BtdrvEventInfo* info = static_cast<const BtdrvEventInfo*>(event_data);
-    // В зависимости от версии прошивки, адрес находится в разных местах
-    #if SWITCH_FIRMWARE >= MAKEFIRMVER(12,0,0)
-        m_connected_address = info->inquiry_device.v12.addr;
-    #else
-        m_connected_address = info->inquiry_device.v1.addr;
-    #endif
-    m_connected = true;
-}
-
-void BluetoothDevice::HandleDisconnectionEvent(const void* event_data) {
-    m_connected = false;
-}
-
-Result BluetoothDevice::SetupHidProfile() {
-    printf("Setting up HID device profile...\n");
-    
-    // Настраиваем HID дескриптор
-    BtdrvHidReport hid_descriptor = {};
-    hid_descriptor.size = sizeof(HID_DESCRIPTOR);
-    if (sizeof(HID_DESCRIPTOR) > sizeof(hid_descriptor.data)) {
-        printf("HID descriptor too large: %zu > %zu\n", 
-               sizeof(HID_DESCRIPTOR), sizeof(hid_descriptor.data));
-        return -1;
+void BluetoothDevice::Finalize() {
+    if (m_initialized) {
+        if (m_connected) {
+            Disconnect();
+        }
+        hiddbgDetachHdlsVirtualDevice(m_handle);
+        hiddbgExit();
+        m_initialized = false;
     }
-    memcpy(hid_descriptor.data, HID_DESCRIPTOR, sizeof(HID_DESCRIPTOR));
-
-    // Регистрируем устройство как HID контроллер
-    printf("Registering HID device...\n");
-    Event regitster_event={0};
-    Result rc = btdrvRegisterBleHidEvent(&regitster_event); // 0x02 = Gamepad
-    if (R_FAILED(rc)) {
-        printf("Failed to register HID device: %x\n", rc);
-    } else {
-        printf("Successfully registered HID device\n");
-    }
-    
-    return rc;
 }

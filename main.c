@@ -83,7 +83,9 @@ bool mainMenu()
 			// printf("\x1b[2;1HWaiting for Bluetooth connection...");
 			// printf("\x1b[3;1HPress B to cancel");
 		}
-		else if(kDown & KEY_MINUS){ 
+		else if(kDown & KEY_MINUS){
+			consoleUpdate(NULL); 
+			printf("BYE!!!!!!!!!!!!!!!!!");
             break;
                }
 

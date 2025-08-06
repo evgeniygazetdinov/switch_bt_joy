@@ -39,9 +39,10 @@ const int KEY_PLUS = 1024;
 const int KEY_MINUS = 2048;
 
 bool mainLoop() {
-    printf("\n\n-------- Main Menu --------\n");
+    printf("\n\n------------------------------ Main Menu ------------------------------\n");
     printf("Press B to initialize Bluetooth\n");
     printf("Press - to exit\n");
+    printf("\n\n-----------------------------------------------------------------------\n");
 
     // Создаем Bluetooth устройство
     BluetoothDevice device;
