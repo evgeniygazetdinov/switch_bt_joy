@@ -1,80 +1,80 @@
 # Switch Bluetooth Joy
 
-Расширенная реализация Bluetooth-функциональности для Nintendo Switch, позволяющая использовать консоль в режиме джостика
+Extended Bluetooth functionality implementation for Nintendo Switch, allowing the console to be used in joystick mode
 
-## Особенности
+## Features
 
-- Поддержка режима хоста (Host) и устройства (Device)
-- Расширенное управление Bluetooth-подключениями
-- Обработка HID-событий
-- Поддержка различных типов Bluetooth-устройств
-- Встроенная обработка ошибок и отчетность
+- Support for Host and Device modes
+- Advanced Bluetooth connection management
+- HID event handling
+- Support for various Bluetooth device types
+- Built-in error handling and reporting
 
-## Требования
+## Requirements
 
-- devkitPro с установленным devkitA64
-- libnx (последняя версия)
-- Прошивка Nintendo Switch с поддержкой Bluetooth
+- devkitPro with devkitA64 installed
+- libnx (latest version)
+- Nintendo Switch firmware with Bluetooth support
 
-## Установка
+## Installation
 
-1. Установите devkitPro и необходимые компоненты:
+1. Install devkitPro and required components:
 ```bash
-# На Linux
+# On Linux
 wget https://github.com/devkitPro/pacman/releases/latest/download/devkitpro-pacman.deb
 sudo dpkg -i devkitpro-pacman.deb
 sudo dkp-pacman -S switch-dev
 ```
 
-2. Настройте переменные окружения:
+2. Set up environment variables:
 ```bash
 export DEVKITPRO=/opt/devkitpro
 export DEVKITARM=/opt/devkitpro/devkitARM
 export DEVKITPPC=/opt/devkitpro/devkitPPC
 ```
 
-3. Клонируйте репозиторий:
+3. Clone the repository:
 ```bash
 git clone https://github.com/yourusername/switch_bt_joy.git
 cd switch_bt_joy
 ```
 
-4. Соберите проект:
+4. Build the project:
 ```bash
 make clean
 make
 ```
 
-## Использование
+## Usage
 
-1. Скопируйте файл `switch_bt_joy.nro` на SD-карту вашей Nintendo Switch в папку `/switch/`
-2. Запустите приложение через меню Homebrew
+1. Copy the `switch_bt_joy.nro` file to your Nintendo Switch's SD card in the `/switch/` folder
+2. Launch the application through the Homebrew menu
 
-### Основные функции
+### Main Functions
 
-- Инициализация Bluetooth:
+- Bluetooth initialization:
 ```cpp
 BluetoothHandler bt;
 if (!bt.initialize()) {
-    // Обработка ошибки
+    // Error handling
 }
 ```
 
-- Включение режима поиска устройств:
+- Enable device discovery mode:
 ```cpp
 if (!bt.startAdvertising()) {
-    // Обработка ошибки
+    // Error handling
 }
 ```
 
-- Ожидание подключения:
+- Wait for connection:
 ```cpp
-if (!bt.waitForConnection(5000)) { // таймаут 5 секунд
-    // Обработка ошибки
+if (!bt.waitForConnection(5000)) { // 5 second timeout
+    // Error handling
 }
 ```
 
-## Структура проекта
+## Project Structure
 
 ```
 switch_bt_joy/
@@ -91,49 +91,49 @@ switch_bt_joy/
 └── README.md
 ```
 
-## Архитектура
+## Architecture
 
-Проект использует трехуровневую архитектуру:
+The project uses a three-tier architecture:
 
-1. **Верхний уровень** (`bluetooth_handler.h/cpp`):
-   - Предоставляет удобный API для работы с Bluetooth
-   - Управляет состоянием подключения
-   - Обрабатывает ошибки
+1. **Top level** (`bluetooth_handler.h/cpp`):
+   - Provides a convenient API for working with Bluetooth
+   - Manages connection state
+   - Handles errors
 
-2. **Средний уровень** (`bluetooth_core.hpp/cpp`):
-   - Абстрагирует системные вызовы
-   - Реализует базовые Bluetooth-операции
-   - Управляет режимами работы
+2. **Middle level** (`bluetooth_core.hpp/cpp`):
+   - Abstracts system calls
+   - Implements basic Bluetooth operations
+   - Manages operating modes
 
-3. **Нижний уровень** (`bluetooth_types.hpp`):
-   - Определяет типы данных
-   - Предоставляет константы и перечисления
-   - Обеспечивает совместимость типов
+3. **Bottom level** (`bluetooth_types.hpp`):
+   - Defines data types
+   - Provides constants and enumerations
+   - Ensures type compatibility
 
-## Известные проблемы
+## Known Issues
 
-- Возможны проблемы совместимости с некоторыми версиями прошивки
-- Ограниченная поддержка некоторых типов Bluetooth-устройств
-- Требуется тестирование на различных версиях системного ПО
+- Possible compatibility issues with some firmware versions
+- Limited support for certain types of Bluetooth devices
+- Testing required on different system software versions
 
-## Вклад в проект
+## Contributing
 
-1. Форкните репозиторий
-2. Создайте ветку для ваших изменений
-3. Внесите изменения
-4. Отправьте pull request
+1. Fork the repository
+2. Create a branch for your changes
+3. Make your changes
+4. Submit a pull request
 
-## Лицензия
+## License
 
-MIT License. См. файл LICENSE для подробностей.
+MIT License. See the LICENSE file for details.
 
-## Авторы
+## Authors
 
-- Основной разработчик: [Ваше имя]
-- Соавторы: [Список соавторов]
+- Main developer: [Your name]
+- Co-authors: [List of co-authors]
 
-## Благодарности
+## Acknowledgements
 
-- Команде devkitPro за отличный инструментарий
-- Сообществу Nintendo Switch homebrew за поддержку и тестирование
-- Всем контрибьюторам за помощь в развитии проекта
+- The devkitPro team for the excellent toolkit
+- The Nintendo Switch homebrew community for support and testing
+- All contributors for helping develop the project

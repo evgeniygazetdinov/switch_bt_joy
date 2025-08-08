@@ -1,51 +1,35 @@
-#pragma once
+// bluetooth_device.hpp
+#ifndef BLUETOOTH_DEVICE_HPP
+#define BLUETOOTH_DEVICE_HPP
+
 #include <switch.h>
 
-// Определяем версию прошивки
-#define MAKEFIRMVER(major, minor, micro) ((major << 16) | (minor << 8) | (micro))
-#define SWITCH_FIRMWARE MAKEFIRMVER(12,0,0)  // Используем последнюю версию
-
-// Основные типы из libnx
-using Address = ::BtdrvAddress;
-using DeviceClass = ::BtdrvClassOfDevice;
-using EventType = ::BtdrvEventType;
-using EventInfo = ::BtdrvEventInfo;
-using Event = ::Event;
-
 class BluetoothDevice {
+private:
+    HiddbgHdlsHandle m_handle;
+    HiddbgHdlsSessionId m_session_id;  // Session ID
+    bool m_initialized;
+    bool m_connected;
+    bool m_advertising;  // Flag to track advertising state
+    BtdrvAddress m_device_address;  // Device MAC address
+
+    void Finalize();
+
 public:
     BluetoothDevice();
     ~BluetoothDevice();
-
-    // Инициализация и завершение работы
+    void PrintDeviceInfo();
     Result Initialize();
-    void Finalize();
-    bool IsInitialized() const { return m_initialized; }
-
-    // Управление соединением
+    Result StartAdvertising();  // New method to start Bluetooth advertising
+    Result StopAdvertising();   // New method to stop Bluetooth advertising
     Result WaitForConnection();
     Result Disconnect();
-    bool IsConnected() const { return m_connected; }
-    void StopWaiting() { m_waiting = false; }  
-
-    // Отправка HID репорта
     Result SendReport(const uint8_t* report, size_t size);
-
-
-private:
-    // Методы для работы с Bluetooth
-    Result EnableBluetooth();
-    Result SetupDeviceMode();
-    Result SetupHidProfile();
-
-    // Обработчики событий
-    void HandleConnectionEvent(const void* event_data);
-    void HandleDisconnectionEvent(const void* event_data);
-
-    // Буфер для событий Bluetooth
-    Event m_event_buffer[0x400];
-    bool m_initialized;
-    bool m_connected;
-    bool m_waiting;  
-    Address m_connected_address;
+    bool IsConnected() const { return m_connected; }
+    bool IsAdvertising() const { return m_advertising; }  // Getter for advertising state
+    
+    // Public method for explicit Finalize() call
+    void Shutdown() { Finalize(); }
 };
+
+#endif // BLUETOOTH_DEVICE_HPP
