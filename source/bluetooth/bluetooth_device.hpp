@@ -15,7 +15,7 @@ private:
 public:
     BluetoothDevice();
     ~BluetoothDevice();
-
+    void PrintDeviceInfo();
     Result Initialize();
     Result WaitForConnection();
     Result Disconnect();
