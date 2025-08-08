@@ -4,29 +4,29 @@
 #include <ctime>
 #include <cstdlib>
 
-// Структура для хранения состояния кнопок
+// Structure for storing button states
 struct ButtonState {
-    uint8_t buttons;  // Один байт для всех кнопок, каждый бит = одна кнопка
-    int8_t stick_x;   // Положение стика по X (-127 до 127)
-    int8_t stick_y;   // Положение стика по Y (-127 до 127)
+    uint8_t buttons;  // One byte for all buttons, each bit = one button
+    int8_t stick_x;   // Stick position on X axis (-127 to 127)
+    int8_t stick_y;   // Stick position on Y axis (-127 to 127)
 };
 
 // namespace {
-//     // Размер HID репорта: 1 байт кнопки + 2 байта стик
+//     // HID report size: 1 byte buttons + 2 bytes stick
 //     constexpr size_t HID_REPORT_SIZE = 3;
     
-//     // Битовые маски для каждой кнопки в байте HID репорта
-//     constexpr uint8_t BUTTON_A  = 0x01;  // Бит 0
-//     constexpr uint8_t BUTTON_B  = 0x02;  // Бит 1
-//     constexpr uint8_t BUTTON_X  = 0x04;  // Бит 2
-//     constexpr uint8_t BUTTON_Y  = 0x08;  // Бит 3
-//     constexpr uint8_t BUTTON_L  = 0x10;  // Бит 4
-//     constexpr uint8_t BUTTON_R  = 0x20;  // Бит 5
-//     constexpr uint8_t BUTTON_ZL = 0x40;  // Бит 6
-//     constexpr uint8_t BUTTON_ZR = 0x80;  // Бит 7
+//     // Bit masks for each button in the HID report byte
+//     constexpr uint8_t BUTTON_A  = 0x01;  // Bit 0
+//     constexpr uint8_t BUTTON_B  = 0x02;  // Bit 1
+//     constexpr uint8_t BUTTON_X  = 0x04;  // Bit 2
+//     constexpr uint8_t BUTTON_Y  = 0x08;  // Bit 3
+//     constexpr uint8_t BUTTON_L  = 0x10;  // Bit 4
+//     constexpr uint8_t BUTTON_R  = 0x20;  // Bit 5
+//     constexpr uint8_t BUTTON_ZL = 0x40;  // Bit 6
+//     constexpr uint8_t BUTTON_ZR = 0x80;  // Bit 7
 // }
 
-// // Преобразование состояния кнопок в HID репорт
+// // Convert button state to HID report
 // void CreateHidReport(const ButtonState& state, uint8_t* report) {
 //     report[0] = state.buttons;
 //     report[1] = state.stick_x;
@@ -46,7 +46,7 @@ bool mainLoop() {
     printf("Press - to exit\n");
     printf("\n\n-----------------------------------------------------------------------\n");
 
-    // Создаем Bluetooth устройство
+    // Create Bluetooth device
     BluetoothDevice device;
     ButtonState button_state = {};
     //uint8_t hid_report[HID_REPORT_SIZE] = {};
@@ -59,7 +59,7 @@ bool mainLoop() {
     bool checking_connections = false;
 
     while (appletMainLoop() && !should_exit) {
-        // Сканируем ввод
+        // Scan input
         padUpdate(&pad);
         u64 kDown = padGetButtonsDown(&pad);
         
@@ -67,13 +67,13 @@ bool mainLoop() {
             printf("Exiting...\n");
             should_exit = true;
             
-            // Если устройство было инициализировано, корректно завершаем работу с ним
+            // If the device was initialized, properly terminate it
             if (device.IsConnected()) {
                 printf("Disconnecting Bluetooth device...\n");
                 device.Disconnect();
             }
             
-            // Продолжаем выполнение цикла, чтобы корректно завершить все процессы
+            // Continue executing the loop to properly terminate all processes
             continue;
         }
 
@@ -83,21 +83,21 @@ bool mainLoop() {
             if (R_SUCCEEDED(result)) {
                 device.PrintDeviceInfo();
                 
-                // Запускаем Bluetooth-рекламу
+                // Start Bluetooth advertising
                 printf("Starting Bluetooth advertising...\n");
                 result = device.StartAdvertising();
                 if (R_FAILED(result)) {
                     printf("Failed to start advertising: 0x%x\n", result);
                 }
                 
-                // Начинаем проверять подключения
+                // Start checking connections
                 checking_connections = true;
             } else {
                 printf("Failed to initialize Bluetooth: 0x%x\n", result);
             }
         }
 
-        // Проверяем подключения если включено
+        // Check connections if enabled
         if (checking_connections) {
                 Result result_of_wait = device.WaitForConnection();
                 if (R_FAILED(result_of_wait)) {
@@ -108,11 +108,11 @@ bool mainLoop() {
         }
         
         consoleUpdate(NULL);
-        svcSleepThread(100000000ULL); // Спим 100мс чтобы не грузить процессор
+        svcSleepThread(100000000ULL); // Sleep 100ms to avoid CPU overload
     }
     //device.Shutdown();
 
-    // Корректно освобождаем ресурсы перед выходом
+    // Properly free resources before exit
     printf("Cleaning up resources...\n");
     consoleUpdate(NULL);
     
@@ -120,15 +120,15 @@ bool mainLoop() {
 }
 
 int main(int argc, char* argv[]) {
-    // Инициализация консоли
+    // Initialize console
     consoleInit(NULL);
     
-    // Инициализируем генератор случайных чисел
+    // Initialize random number generator
     srand(time(NULL));
     
     mainLoop();
     
-    // Корректно закрываем консоль
+    // Properly close the console
     consoleExit(NULL);
     return 0;
 }

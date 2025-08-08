@@ -7,12 +7,12 @@
 
 BluetoothDevice::BluetoothDevice() : 
     m_handle{0},
-    m_session_id{0},  // Инициализируем идентификатор сессии
+    m_session_id{0},  // Initialize session ID
     m_initialized(false),
     m_connected(false),
-    m_advertising(false)  // Инициализируем флаг рекламы
+    m_advertising(false)  // Initialize advertising flag
 {
-    // Инициализируем MAC-адрес нулями
+    // Initialize MAC address with zeros
     memset(&m_device_address, 0, sizeof(m_device_address));
 }
 
@@ -31,10 +31,10 @@ Result BluetoothDevice::Initialize() {
         return rc;
     }
     
-    // Инициализируем идентификатор сессии
+    // Initialize session ID
     m_session_id = {0};
     
-    void* workBuffer = aligned_alloc(0x1000, 0x1000);  // Выделяем буфер с выравниванием
+    void* workBuffer = aligned_alloc(0x1000, 0x1000);  // Allocate aligned buffer
     if (workBuffer == NULL) {
         printf("Failed to allocate work buffer\n");
         hiddbgExit();
@@ -51,32 +51,32 @@ Result BluetoothDevice::Initialize() {
     
     HiddbgHdlsDeviceInfo device_info = {0};
 
-    // Устанавливаем тип устройства (FullKey3 - Pro Controller)
+    // Set device type (FullKey3 - Pro Controller)
     device_info.deviceType = HidDeviceType_FullKey3;  // 3
 
-    // Устанавливаем тип интерфейса (Bluetooth)
+    // Set interface type (Bluetooth)
     device_info.npadInterfaceType = HidNpadInterfaceType_Bluetooth;  // 1
 
-    // Устанавливаем цвета контроллера (обязательно для корректной работы)
-    // Используем макрос RGBA8_MAXALPHA или прямые значения
+    // Set controller colors (required for proper operation)
+    // Using RGBA8_MAXALPHA macro or direct values
     // RGBA8_MAXALPHA(r,g,b) = (((r)&0xff)|(((g)&0xff)<<8)|(((b)&0xff)<<16)|(0xff<<24))
 
-    // Белый корпус
+    // White body
     device_info.singleColorBody = 0xFFFFFFFF;  // RGBA8_MAXALPHA(255, 255, 255)
 
-    // Черные кнопки
+    // Black buttons
     device_info.singleColorButtons = 0xFF000000;  // RGBA8_MAXALPHA(0, 0, 0)
 
-    // Цвет левой рукоятки (например, синий)
+    // Left grip color (blue)
     device_info.colorLeftGrip = 0xFF0000FF;  // RGBA8_MAXALPHA(0, 0, 255)
 
-    // Цвет правой рукоятки (например, красный)
+    // Right grip color (red)
     device_info.colorRightGrip = 0xFFFF0000;  // RGBA8_MAXALPHA(255, 0, 0)
 
-    // Для версий прошивки 9.0.0+
+    // For firmware versions 9.0.0+
     // device_info.npadControllerType = NpadControllerType_ProController;
 
-    // Теперь вызываем функцию с правильно инициализированной структурой
+    // Now call the function with properly initialized structure
     rc = hiddbgAttachHdlsVirtualDevice(&m_handle, &device_info);
     if (R_FAILED(rc)) {
         printf("Failed to attach virtual device: 0x%x\n", rc);
@@ -84,15 +84,15 @@ Result BluetoothDevice::Initialize() {
         return rc;
     }
 
-    // Инициализируем генератор случайных чисел
+    // Initialize random number generator
     srand(time(NULL));
     
-    // Генерируем MAC-адрес с префиксом Nintendo (00:1F:32)
+    // Generate MAC address with Nintendo prefix (00:1F:32)
     m_device_address.address[0] = 0x00;
     m_device_address.address[1] = 0x1F;
     m_device_address.address[2] = 0x32;
     
-    // Генерируем случайные байты для остальной части адреса
+    // Generate random bytes for the rest of the address
     m_device_address.address[3] = rand() % 256;
     m_device_address.address[4] = rand() % 256;
     m_device_address.address[5] = rand() % 256;
@@ -117,12 +117,12 @@ void BluetoothDevice::PrintDeviceInfo() {
     printf("=== Bluetooth Virtual Device Info ===\n");
     printf("Device initialized: %s\n", m_initialized ? "Yes" : "No");
     
-    // Выводим информацию о типе устройства
+    // Display device type information
     printf("Device Type: Pro Controller (FullKey3)\n");
     printf("Interface Type: Bluetooth\n");
     printf("Connection Status: %s\n", m_connected ? "Connected" : "Not Connected");
     
-    // Выводим MAC-адрес устройства, если он был сохранен
+    // Display device MAC address if it was saved
     if (m_device_address.address[0] != 0 || 
         m_device_address.address[1] != 0 || 
         m_device_address.address[2] != 0) {
@@ -143,24 +143,24 @@ Result BluetoothDevice::WaitForConnection() {
     printf("Waiting for Bluetooth connection...\n");
     printf("Please connect to the device using your Bluetooth settings.\n");
     
-    // В текущей реализации мы просто симулируем подключение
-    // Для реальной проверки подключения нужно использовать доступные API
+    // In the current implementation, we simply simulate the connection
+    // For real connection checking, we need to use available APIs
     
-    // Пробуем получить информацию о состоянии устройства
+    // Try to get information about the device state
     Result rc = 0;
     
-    // Проверяем, что хендл устройства валиден
+    // Check if the device handle is valid
     if (m_handle.handle != 0) {
-        // Симулируем успешное подключение
+        // Simulate successful connection
         printf("Device connected successfully!\n");
         m_connected = true;
         
-        // Выводим обновленную информацию об устройстве
+        // Display updated device information
         printf("=== Updated Device Status ===\n");
         printf("Connection Status: Connected\n");
         printf("Device Handle: 0x%x\n", m_handle.handle);
         
-        // Выводим MAC-адрес устройства
+        // Display device MAC address
         if (m_device_address.address[0] != 0 || 
             m_device_address.address[1] != 0 || 
             m_device_address.address[2] != 0) {
@@ -174,7 +174,7 @@ Result BluetoothDevice::WaitForConnection() {
         return 0;
     }
     
-    // Если хендл не валиден, считаем что устройство не подключено
+    // If the handle is not valid, consider the device not connected
     printf("Connection not established. Please try again.\n");
     return MAKERESULT(Module_Libnx, LibnxError_NotFound);
 }
@@ -186,18 +186,18 @@ Result BluetoothDevice::Disconnect() {
 
     printf("Disconnecting Bluetooth device...\n");
     
-    // Если реклама активна, останавливаем её перед отключением
+    // If advertising is active, stop it before disconnecting
     if (m_advertising) {
         printf("Stopping advertising before disconnect...\n");
         Result rc = StopAdvertising();
         if (R_FAILED(rc)) {
             printf("Warning: Failed to stop advertising: 0x%x\n", rc);
-            // Продолжаем отключение даже при ошибке остановки рекламы
+            // Continue disconnection even if advertising stop fails
         }
     }
     
-    // Здесь можно добавить вызов API для отключения устройства,
-    // если такой API доступен в libnx
+    // Here you can add API call for device disconnection,
+    // if such API is available in libnx
     
     m_connected = false;
     printf("Device disconnected successfully\n");
@@ -237,15 +237,15 @@ Result BluetoothDevice::StartAdvertising() {
     
     printf("Starting Bluetooth advertising...\n");
     
-    // Инициализируем btdrv сервис
+    // Initialize btdrv service
     Result rc = btdrvInitialize();
     if (R_FAILED(rc)) {
         printf("Failed to initialize btdrv: 0x%x\n", rc);
         return rc;
     }
     
-    // Устанавливаем устройство в режим обнаружения
-    // Используем более простой API, доступный в текущей версии libnx
+    // Set device to discoverable mode
+    // Using a simpler API available in the current version of libnx
     rc = btdrvEnableBluetooth();
     if (R_FAILED(rc)) {
         printf("Failed to enable Bluetooth: 0x%x\n", rc);
@@ -253,7 +253,7 @@ Result BluetoothDevice::StartAdvertising() {
         return rc;
     }
     
-    // Устанавливаем режим видимости
+    // Set visibility mode
     rc = btdrvSetVisibility(true, true);  // discoverable=true, connectable=true
     if (R_FAILED(rc)) {
         printf("Failed to set visibility: 0x%x\n", rc);
@@ -284,21 +284,21 @@ Result BluetoothDevice::StopAdvertising() {
     
     printf("Stopping Bluetooth advertising...\n");
     
-    // Отключаем видимость
+    // Disable visibility
     Result rc = btdrvSetVisibility(false, false);  // discoverable=false, connectable=false
     if (R_FAILED(rc)) {
         printf("Failed to disable visibility: 0x%x\n", rc);
-        // Продолжаем даже при ошибке
+        // Continue even if disabling visibility fails
     }
     
-    // Отключаем Bluetooth
+    // Disable Bluetooth
     rc = btdrvDisableBluetooth();
     if (R_FAILED(rc)) {
         printf("Failed to disable Bluetooth: 0x%x\n", rc);
-        // Продолжаем даже при ошибке
+        // Continue even if disabling Bluetooth fails
     }
     
-    // Выходим из btdrv сервиса
+    // Exit btdrv service
     btdrvExit();
     
     m_advertising = false;
@@ -309,27 +309,27 @@ Result BluetoothDevice::StopAdvertising() {
 
 void BluetoothDevice::Finalize() {
     if (m_initialized) {
-        // Если устройство подключено, отключаем его
+        // If the device is connected, disconnect it
         if (m_connected) {
             printf("Disconnecting device...\n");
             Disconnect();
         }
         
-        // Отсоединяем виртуальное устройство
+        // Detach virtual device
         printf("Detaching virtual device...\n");
         Result rc = hiddbgDetachHdlsVirtualDevice(m_handle);
         if (R_FAILED(rc)) {
             printf("Warning: Failed to detach virtual device: 0x%x\n", rc);
         }
         
-        // Отсоединяем рабочий буфер, используя сохраненный идентификатор сессии
+        // Detach work buffer using the saved session ID
         printf("Detaching work buffer...\n");
         rc = hiddbgReleaseHdlsWorkBuffer(m_session_id);
         if (R_FAILED(rc)) {
             printf("Warning: Failed to release work buffer: 0x%x\n", rc);
         }
         
-        // Выходим из hiddbg сервиса
+        // Exit hiddbg service
         printf("Exiting hiddbg service...\n");
         hiddbgExit();
         
