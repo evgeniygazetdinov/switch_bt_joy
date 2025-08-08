@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <switch.h>
 #include "bluetooth/bluetooth_device.hpp"
+#include <ctime>
+#include <cstdlib>
 
 // Структура для хранения состояния кнопок
 struct ButtonState {
@@ -39,9 +41,10 @@ const int KEY_PLUS = 1024;
 const int KEY_MINUS = 2048;
 
 bool mainLoop() {
-    printf("\n\n-------- Main Menu --------\n");
+    printf("\n\n------------------------------ Main Menu ------------------------------\n");
     printf("Press B to initialize Bluetooth\n");
     printf("Press - to exit\n");
+    printf("\n\n-----------------------------------------------------------------------\n");
 
     // Создаем Bluetooth устройство
     BluetoothDevice device;
@@ -52,50 +55,80 @@ bool mainLoop() {
     PadState pad;
     padInitializeDefault(&pad);
 
+    bool should_exit = false;
+    bool checking_connections = false;
 
-    while (appletMainLoop()) {
+    while (appletMainLoop() && !should_exit) {
         // Сканируем ввод
         padUpdate(&pad);
         u64 kDown = padGetButtonsDown(&pad);
-        bool checking_connections = false;
+        
         if (kDown & KEY_MINUS) {
             printf("Exiting...\n");
-            return false;
+            should_exit = true;
+            
+            // Если устройство было инициализировано, корректно завершаем работу с ним
+            if (device.IsConnected()) {
+                printf("Disconnecting Bluetooth device...\n");
+                device.Disconnect();
+            }
+            
+            // Продолжаем выполнение цикла, чтобы корректно завершить все процессы
+            continue;
         }
 
         if (kDown & KEY_B) {
             printf("Initializing Bluetooth...\n");
-            Result result_of_initialize = device.Initialize();
-            if (R_FAILED(result_of_initialize)) {
-                printf("Failed to initialize Bluetooth: %x\n", result_of_initialize);
-                continue;
-            }
-            else{
-                printf("Starting connection check...\n");
+            Result result = device.Initialize();
+            if (R_SUCCEEDED(result)) {
+                device.PrintDeviceInfo();
+                
+                // Запускаем Bluetooth-рекламу
+                printf("Starting Bluetooth advertising...\n");
+                result = device.StartAdvertising();
+                if (R_FAILED(result)) {
+                    printf("Failed to start advertising: 0x%x\n", result);
+                }
+                
+                // Начинаем проверять подключения
                 checking_connections = true;
+            } else {
+                printf("Failed to initialize Bluetooth: 0x%x\n", result);
             }
         }
 
         // Проверяем подключения если включено
         if (checking_connections) {
-            Result result_of_wait = device.WaitForConnection();
-            if (R_FAILED(result_of_wait)) {
-                printf("Connection check failed: %x\n", result_of_wait);
-                checking_connections = false;
-            }
+                Result result_of_wait = device.WaitForConnection();
+                if (R_FAILED(result_of_wait)) {
+                    printf("Connection check failed: %x\n", result_of_wait);
+                    checking_connections = false;
+                }
+                svcSleepThread(100000000ULL); 
         }
+        
         consoleUpdate(NULL);
         svcSleepThread(100000000ULL); // Спим 100мс чтобы не грузить процессор
     }
+    //device.Shutdown();
 
+    // Корректно освобождаем ресурсы перед выходом
+    printf("Cleaning up resources...\n");
+    consoleUpdate(NULL);
+    
     return true;
 }
 
 int main(int argc, char* argv[]) {
     // Инициализация консоли
-
-	consoleInit(NULL);
+    consoleInit(NULL);
+    
+    // Инициализируем генератор случайных чисел
+    srand(time(NULL));
+    
     mainLoop();
+    
+    // Корректно закрываем консоль
     consoleExit(NULL);
     return 0;
 }
