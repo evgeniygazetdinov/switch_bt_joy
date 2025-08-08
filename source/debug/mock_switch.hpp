@@ -5,10 +5,10 @@
 #include <sys/select.h>
 #include <stdio.h>
 
-// Mock определения из libnx
+// Mock definitions from libnx
 using HidNpadButton = uint64_t;
 
-// Эмуляция констант кнопок Switch
+// Emulation of Switch button constants
 constexpr HidNpadButton HidNpadButton_A     = 1ULL << 0;
 constexpr HidNpadButton HidNpadButton_B     = 1ULL << 1;
 constexpr HidNpadButton HidNpadButton_X     = 1ULL << 2;
@@ -22,7 +22,7 @@ constexpr HidNpadButton HidNpadButton_Down  = 1ULL << 9;
 constexpr HidNpadButton HidNpadButton_Left  = 1ULL << 10;
 constexpr HidNpadButton HidNpadButton_Right = 1ULL << 11;
 
-// Функция для неблокирующего чтения клавиши
+// Function for non-blocking key reading
 inline int kbhit(void) {
     struct timeval tv;
     fd_set fds;
@@ -37,7 +37,7 @@ inline int kbhit(void) {
 inline void init_terminal(void) {
     struct termios term;
     tcgetattr(0, &term);
-    term.c_lflag &= ~(ICANON | ECHO); // Отключаем канонический режим и эхо
+    term.c_lflag &= ~(ICANON | ECHO); // Disable canonical mode and echo
     tcsetattr(0, TCSANOW, &term);
 }
 
